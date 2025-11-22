@@ -1,5 +1,35 @@
 Adapted codes from [nnx-lm](https://pypi.org/project/nnx-lm/) to try some stuff (WIP)
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1XYyO04by5UCaMoH0C2MUmsLPOwddN5Gp?usp=sharing)
+
+## Quickstart
+
+On Apple mac:
+```
+pip install rcrlm
+```
+
+On linux/cuda:
+```
+pip install rcrlm[cuda]
+```
+
+On cpu:
+```
+pip install rcrlm[cpu]
+```
+
+```
+rlm
+```
+
+```python
+from rcrlm import load, infer, train
+
+m = load()
+_ = infer('Hello world', **m)
+```
+
 ## Vanilla decoding
 
 ```
@@ -135,5 +165,3 @@ medium red circle
 Prompt processing: 351.1 tokens/sec (12 tokens in 0.0s)
 Token generation: 78.2 tokens/sec (100 tokens in 1.3s)
 ```
-
-
