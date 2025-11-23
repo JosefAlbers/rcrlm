@@ -3,6 +3,9 @@
 Adapted codes from [nnx-lm](https://pypi.org/project/nnx-lm/) to try some stuff (WIP)
 
 ```
+>>> import rcrlm
+>>> rcrlm.main.test()
+
 〄 Testing vanilla decoding...
 ┌────────────────────────────── Streaming ──────────────────────────────┐
 <think>
@@ -35,8 +38,8 @@ I should include some quotes or references to his work. Maybe mention his quote 
 Wait, the user might want the story to be engaging and highlight his legacy. I need to make sure the story flows well, with a good narrative arc. Avoid clichÃ©s, but still capture his essence. Check for any inaccuracies, like his actual birth date and death year. Let me confirm: Einstein was born on April 14, 18
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    234.9 tokens/sec (14 tokens in 0.1s)
-Tokens generation:    167.0 tokens/sec (256 tokens in 1.5s)
+Prompt processing:    257.6 tokens/sec (14 tokens in 0.1s)
+Tokens generation:    167.2 tokens/sec (256 tokens in 1.5s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing batch decoding...
 ┌────────────────────────────── Streaming ──────────────────────────────┐
@@ -52,7 +55,8 @@ Okay, the user is asking for a comparison between the Sortino Ratio for Bitcoin 
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
 <think>
 Okay, I need to write a quick sort algorithm. Let me think about how to approach this. Quick sort is a divide-and-conquer algorithm, right? The basic idea is to select a pivot element, partition the array into elements less than or equal to the pivot and greater than or equal to it, and then recursively sort the subarrays.
-                                                                                                                                                                                                                    First, I should outline the steps. The algorithm should have a function that takes an array and a pivot index. Wait, but how do
+
+First, I should outline the steps. The algorithm should have a function that takes an array and a pivot index. Wait, but how do
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Inp 00001 ──────────────────────────────┐
 <|im_start|>user
@@ -62,7 +66,9 @@ Give me a short introduction to large language model.
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00001 ──────────────────────────────┐
 <think>
-Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need                                                                                                                                                              └───────────────────────────────────────────────────────────────────────┘                                                                                                                                           ┌────────────────────────────── Inp 00002 ──────────────────────────────┐
+Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Inp 00002 ──────────────────────────────┐
 <|im_start|>user
 Write a neurology ICU admission note.
 <|im_end|>
@@ -71,8 +77,10 @@ Write a neurology ICU admission note.
 ┌────────────────────────────── Out 00002 ──────────────────────────────┐
 <think>
 Okay, I need to write a neurology ICU admission note. Let me start by recalling what an ICU admission note typically includes. It's a medical record that outlines the patient's condition, initial assessment, interventions, and any ongoing care.
-                                                                                                                                                                                                                    First, the patient's name and date of admission. I should make sure to include that. Then, the patient's name, age, gender, and primary diagnosis. Since it's a neurology ICU, the main issue is likely a neurological
-└───────────────────────────────────────────────────────────────────────┘                                                                                                                                           ┌────────────────────────────── Inp 00003 ──────────────────────────────┐
+
+First, the patient's name and date of admission. I should make sure to include that. Then, the patient's name, age, gender, and primary diagnosis. Since it's a neurology ICU, the main issue is likely a neurological
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Inp 00003 ──────────────────────────────┐
 <|im_start|>user
 Comparison of Sortino Ratio for Bitcoin and Ethereum.<|im_end|>
 <|im_start|>assistant
@@ -80,41 +88,48 @@ Comparison of Sortino Ratio for Bitcoin and Ethereum.<|im_end|>
 ┌────────────────────────────── Out 00003 ──────────────────────────────┐
 <think>
 Okay, the user is asking for a comparison between the Sortino Ratio for Bitcoin and Ethereum. Let me start by recalling what the Sortino Ratio is. It's a measure of risk-adjusted return for a portfolio, right? It's calculated as (Return - Risk-Free Rate) divided by the Risk (Standard Deviation). The Sortino Ratio is usually used for a single asset, so comparing it between Bitcoin and Ethereum would be useful.
-                                                                                                                                                                                                                    First, I need to check the historical data
+
+First, I need to check the historical data
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:   1437.3 tokens/sec (72 tokens in 0.1s)
-Tokens generation:    331.1 tokens/sec (400 tokens in 1.2s)
+Prompt processing:   1449.6 tokens/sec (72 tokens in 0.0s)
+Tokens generation:    332.8 tokens/sec (400 tokens in 1.2s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing DoRA training...
-epoch=    0 avg_loss=    2.66 elp_train=   14.21
-└ test output: ['<|assistant>\nresher\n\n</think>\n\nHello! ï¸ıropic\nHello! ï¸ıropic']                                                                                                                             epoch=    1 avg_loss=    1.16 elp_train=   14.16
+epoch=    0 avg_loss=    0.33 elp_train=    9.64
 └ test output: ['<svg width="100" height="100" viewBox="-50 -5']
-〄 Testing DoRA decoding...                                                                                                                                                                                         ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
+epoch=    1 avg_loss=    0.05 elp_train=    9.61
+└ test output: ['<svg width="100" height="100" viewBox="-50 -5']
+〄 Testing DoRA decoding...
+┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
 medium red circle
 <|im_end|>
 <|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐                                                                                                                                           <svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="10" fill="#f0f0f0f0f0f0f0f0f0" width="100" height="100" viewBox="-5 50 1
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+<svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="34" fill="#f6f4f5"/></svg>
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    368.3 tokens/sec (12 tokens in 0.0s)
-Tokens generation:     91.1 tokens/sec (100 tokens in 1.1s)
+Prompt processing:    338.5 tokens/sec (12 tokens in 0.0s)
+Tokens generation:    252.0 tokens/sec (256 tokens in 1.0s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing collapse...
 U.shape=(1024, 1024)
 S.shape=(1024,)
 Vt.shape=(1024, 57344)
-U_k=array([[-1.2065296e-02,  4.2261211e-03, -7.1944403e-03, ...,                                                                                                                                                             6.4040911e-03, -6.1178685e-04,  1.0498078e-02],
+U_k=array([[-1.2065296e-02,  4.2261211e-03, -7.1944403e-03, ...,
+         6.4040911e-03, -6.1178685e-04,  1.0498078e-02],
        [ 3.2725159e-02, -2.6491731e-02,  8.7199891e-03, ...,
-        -4.4848169e-03, -2.1432072e-02,  9.7146053e-03],                                                                                                                                                                   [-8.2383193e-02,  6.8220747e-01,  3.2420199e-02, ...,
+        -4.4848169e-03, -2.1432072e-02,  9.7146053e-03],
+       [-8.2383193e-02,  6.8220747e-01,  3.2420199e-02, ...,
          6.7272745e-02,  4.8834421e-02, -9.1014996e-02],
        ...,
        [-4.2217653e-03, -1.2476263e-02,  1.3765656e-02, ...,
         -2.3909433e-02, -3.6274742e-02, -3.4406967e-02],
        [-4.7757355e-03, -2.2323474e-03, -8.0787847e-03, ...,
-         1.5312760e-02,  1.6842240e-02, -3.2537167e-03],                                                                                                                                                                   [-6.3891648e-03,  7.3768338e-03,  4.3904696e-02, ...,
+         1.5312760e-02,  1.6842240e-02, -3.2537167e-03],
+       [-6.3891648e-03,  7.3768338e-03,  4.3904696e-02, ...,
         -1.7012123e-02, -1.6488006e-02, -6.6838279e-02]],
       shape=(1024, 8), dtype=float32)
 S_k=array([14.270441,  9.109717,  8.651474,  8.618107,  8.571209,  8.522299,
@@ -123,7 +138,9 @@ Vt_k=array([[ 0.0046215 ,  0.00096893,  0.00395941, ...,  0.00063386,
         -0.00073552, -0.00023721],
        [ 0.00524898,  0.00137871,  0.00548535, ...,  0.00061748,
         -0.0083794 ,  0.00150371],
-       [-0.00235571, -0.00298685, -0.00143359, ...,  0.00154116,                                                                                                                                                            -0.00174423,  0.0009006 ],                                                                                                                                                                                         ...,
+       [-0.00235571, -0.00298685, -0.00143359, ...,  0.00154116,
+        -0.00174423,  0.0009006 ],
+       ...,
        [ 0.00518476,  0.00237203,  0.00602671, ..., -0.00164276,
          0.0022371 ,  0.00045477],
        [-0.00393195,  0.001701  , -0.00100759, ...,  0.00171548,

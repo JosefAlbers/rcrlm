@@ -19,7 +19,7 @@ def test(task='all'):
         del m
         print('〄 Testing DoRA decoding...')
         m = load()
-        _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False)
+        _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False, max_new_tokens=256)
         del m
     if task == 'collapse' or task == 'all':
         print('〄 Testing collapse...')

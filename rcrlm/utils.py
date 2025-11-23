@@ -474,12 +474,12 @@ LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, 
                 thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
 )
 
-def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, bs=1):
-    def loss_fn(model, X, causal_mask, rope, cache, y):
+def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-4, bs=2, sl=1024):
+    def loss_fn(model, X, causal_mask, rope, cache, y, label_mask):
         logits = model(X, causal_mask, rope, cache)
-        return nn.losses.cross_entropy(logits, y, reduction='mean') # [] for bs>1 need masking padding&query
+        ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
+        return ce.astype(mx.float32).sum() / label_mask.sum()
 
-    # {{
     if lora_cfg is None:
         lora_cfg = {}
     if 'wt_to' not in lora_cfg:
@@ -491,34 +491,59 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
         model.load_weights(lora_cfg['wt_from'], strict=False)
     model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
     mx.eval(model)
-    # }}
     model.train()
     from datasets import load_dataset
     ds = load_dataset(ds_id, split="train").to_list()
-    ds = ds[:100] # debug
-    n_steps = n_epochs * len(ds) # [] bs
+    ds = ds[:100]
+    n_steps = n_epochs * len(ds) / bs
     import mlx.optimizers as optim
-    lr_schedule = optim.cosine_decay(lr, n_steps, 1e-5)
+    lr_schedule = optim.cosine_decay(lr, n_steps, 0.0)
     optimizer = optim.Adam(learning_rate=lr_schedule)
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     roper = Roper(config)
     mx.eval(roper, model, optimizer)
     cache = [lambda x,y: (x,y)]*config.num_hidden_layers
-    for epoch in range(n_epochs): # [] shuffle
+    test_prompt = f"<|im_start|>user\nmedium red circle\n<|im_end|>\n<|im_start|>assistant\n"
+    eos_id = config.eos_token_id
+    import random
+    for epoch in range(n_epochs):
         tic_train = time.perf_counter()
         model.train()
         total_loss = num_batches = 0
-        for row in ds: # [] allows only bs=1 d/t masking
-            prompt = f"<|im_start|>user\n{row['description'].strip()}\n<|im_end|>\n<|im_start|>assistant\n{row['value'].strip()}\n<|im_end|>"
-            input_ids = tokenizer.encode(prompt) # [] mask query
-            input_ids = input_ids[:128] # [] ad hoc for crash
-            input_ids += [config.eos_token_id]
-            total_len = len(input_ids) - 1
-            rope = roper(mx.arange(total_len)[None,:])
-            causal_mask = create_causal_mask(mx.ones((1, total_len), dtype=mx.bool_))
-            X = mx.array([input_ids[:-1]])
-            y = mx.array([input_ids[1:]])
-            loss, grads = loss_and_grad_fn(model, X, causal_mask, rope, cache, y)
+        ds = random.sample(ds, len(ds))
+        for i in range(0, len(ds), bs): # [] allows only bs=1 d/t masking
+            batch_rows = ds[i:i+bs]
+            _Xs = []
+            _ys = []
+            _lms = []
+            _ams = []
+            for row in batch_rows:
+                str_i = f"<|im_start|>user\n{row['description'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
+                str_o = f"{row['value'].strip()}\n<|im_end|>"
+                iid_i = tokenizer.encode(str_i)
+                iid_o = tokenizer.encode(str_o) + [eos_id]
+                input_ids = iid_i + iid_o
+                input_ids = input_ids[:sl]
+                label_mask = [0]*len(iid_i) + [1]*len(iid_o)
+                label_mask = label_mask[:sl]
+                _Xs.append(input_ids[:-1])
+                _ys.append(input_ids[1:])
+                _lms.append(label_mask[1:])
+                _ams.append([True]*(len(label_mask)-1))
+            _seq_len = max(len(_m) for _m in _lms)
+            X = []
+            y = []
+            label_mask = []
+            attention_mask = []
+            for e in range(len(_lms)):
+                _pad_len = _seq_len - len(_ams[e])
+                X.append(_Xs[e]+[eos_id]*_pad_len)
+                y.append(_ys[e]+[eos_id]*_pad_len)
+                label_mask.append(_lms[e]+[0]*_pad_len)
+                attention_mask.append(_ams[e]+[False]*_pad_len)
+            rope = roper(mx.array([list(range(_seq_len))]*len(_ams)))
+            causal_mask = create_causal_mask(attention_mask)
+            loss, grads = loss_and_grad_fn(model, mx.array(X), causal_mask, rope, cache, mx.array(y), mx.array(label_mask))
             optimizer.update(model, grads)
             mx.eval(loss, model, optimizer)
             total_loss += loss.item()
@@ -526,11 +551,10 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
         avg_loss = total_loss / len(ds)
         elp_train = time.perf_counter() - tic_train
         print(f'{epoch=:5d} {avg_loss=:8.2f} {elp_train=:8.2f}')
-        # {{
         model.eval()
-        _dict_eval = infer('medium red circle\n', model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False)
+        mx.eval(model)
+        _dict_eval = infer(test_prompt, model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False, use_chat_template=False)
         print('└ test output:', _dict_eval['out_str'])
-        # }}
 
     from mlx.utils import tree_flatten
     metadata = lora_cfg|dict(wt_from=lora_cfg['wt_to'], wt_to=None)
@@ -538,11 +562,8 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
     mx.save_safetensors(lora_cfg['wt_to'], dict(tree_flatten(model.trainable_parameters())), metadata=metadata)
     mx.clear_cache()
 # }}} === TRAIN ===
-
+# {{{ === SVD ===
 import numpy as np
-
-
-
 
 def collapse(model, tokenizer, config):
     collapse_targets = ['self_attn.o_proj']
@@ -587,15 +608,4 @@ def collapse(model, tokenizer, config):
     w0_recon = B@Cs[0] + LoRAs[0][0]@LoRAs[0][1]
     print(f'{Ws[0]=}')
     print(f'{w0_recon=}')
-
-
-
-
-
-
-
-
-
-
-
-
+# }}} === SVD ===
