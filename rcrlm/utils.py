@@ -17,6 +17,8 @@ from pathlib import Path
 import mlx.core as mx
 import mlx.nn as nn
 
+PRETTY_HW = '─'*30
+
 def strftime_now(format="%Y-%m-%d %H:%M:%S"):
     return datetime.now().strftime(format)
 
@@ -30,10 +32,11 @@ def tqdm_hook(t):
         last_b[0] = downloaded
     return update_to
 
-def download_file(url, path, desc):
+def download_file(url, path, desc, verbose=False):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     if os.path.exists(path):
-        print(f"File '{path}' already exists. Skipping.")
+        if verbose:
+            print(f"File '{path}' already exists. Skipping.")
         return
     with tqdm(unit='B', unit_scale=True, desc=desc, leave=False) as t:
         urlretrieve(url, path, reporthook=tqdm_hook(t))
@@ -140,7 +143,7 @@ def load_model(model_cls, model_dir, model_cfg):
     # # {{
     # if lora_cfg:
     #     model.freeze()
-    #     linear_to_lora_layers(model.model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
+    #     linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
     #     if lora_cfg['wt_from'] and os.path.exists(lora_cfg['wt_from']):
     #         model.load_weights(lora_cfg['wt_from'], strict=False)
     #     model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
@@ -149,13 +152,29 @@ def load_model(model_cls, model_dir, model_cfg):
     # model.eval()
     return model
 
+def measure_performance(start_time, prompt_time, end_time, batch_size, seq_length, gen_length, verbose=True):
+    prompt_duration = prompt_time - start_time
+    generation_duration = end_time - prompt_time
+    tokens_processed = batch_size * seq_length
+    tokens_generated = gen_length * batch_size
+    prompt_throughput = tokens_processed / prompt_duration if prompt_duration > 0 else 0
+    generation_throughput = tokens_generated / generation_duration if generation_duration > 0 else 0
+    metrics = {
+        "prompt_throughput": prompt_throughput,
+        "generation_throughput": generation_throughput,
+        "prompt_tokens": tokens_processed,
+        "prompt_time": prompt_duration,
+        "generation_tokens": tokens_generated,
+        "generation_time": generation_duration
+    }
+    if verbose:
+        print(f'┌{PRETTY_HW} Benchmark {PRETTY_HW}┐')
+        print(f"Prompt processing: {prompt_throughput:8.1f} tokens/sec ({tokens_processed} tokens in {prompt_duration:.1f}s)")
+        print(f"Tokens generation: {generation_throughput:8.1f} tokens/sec ({tokens_generated} tokens in {generation_duration:.1f}s)")
+        print(f'└{PRETTY_HW*2}───────────┘')
+    return metrics
 # }}} === PREP ===
 # {{{ === ROPE/CACHE ===
-
-# @mx.compile
-# def update_cache(self_max_len, self_k, self_v, k, v):
-#     return mx.concat([self_k, k], axis=2)[:,:,-self_max_len:,:], mx.concat([self_v, v], axis=2)[:,:,-self_max_len:,:]
-
 @mx.compile
 def update_cache(max_len, cache_k, cache_v, new_k, new_v):
     seq_len = new_k.shape[2]
@@ -171,7 +190,11 @@ class RollCacher(nn.Module):
         self.v = mx.zeros((batch_size, num_heads, max_len, head_dim), dtype=dtype) if v is None else v
 
     def __call__(self, k, v):
-        self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
+        # print(f'{k.shape=}')
+        # print(f'{v.shape=}')
+        # self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
+        self.k = self_k = mx.concatenate([self.k[:, :, k.shape[2]:, :], k], axis=2)
+        self.v = self_v = mx.concatenate([self.v[:, :, v.shape[2]:, :], v], axis=2)
         return self_k, self_v
 
 class CatCacher(nn.Module):
@@ -194,15 +217,18 @@ class Roper:#(nn.Module):
         elif get_nested(config.extra_config, ["rope_scaling", "type"])=='longrope':
             self._su(config, su_len)
         else:
-            dim = int(config.head_dim*config.partial_rotary_factor/2)
+            dim = int(config.head_dim*getattr(config, "partial_rotary_factor", 1.0)/2)
             self.freq = 1.0 / (config.rope_theta ** (mx.arange(0, dim, dtype=mx.float32) / dim))
+        self.dtype=config.dtype
 
     def __call__(self, positions):
         positions = positions[:, None, :, None]
         angles = positions * self.freq
+        # angles = mx.concatenate([angles, angles], axis=-1) # for rotate_half
         cos = mx.cos(angles) * self.su_scale
         sin = mx.sin(angles) * self.su_scale
-        return mx.stop_gradient(cos), mx.stop_gradient(sin)
+        # return mx.stop_gradient(cos), mx.stop_gradient(sin)
+        return cos.astype(self.dtype), sin.astype(self.dtype)
 
     def _llama3(self, config):
         rot_dims = int(config.head_dim * config.partial_rotary_factor)
@@ -233,7 +259,7 @@ class Roper:#(nn.Module):
         factor = mx.array(factor, dtype=mx.float32)
         self.freq = nnx.Variable(1.0 / (freqs * factor))
 
-def apply_rope(q, k, cos, sin, rot_dims=None, traditional=False):
+def apply_rope(dtype, q, k, cos, sin, rot_dims=None, traditional=False):
     if rot_dims is None:
         q_rot, k_rot = q, k
     else:
@@ -244,25 +270,32 @@ def apply_rope(q, k, cos, sin, rot_dims=None, traditional=False):
         q_odd  = q_rot[..., 1::2]
         k_even = k_rot[..., 0::2]
         k_odd  = k_rot[..., 1::2]
-        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape).astype(q.dtype)
-        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape).astype(k.dtype)
+        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape).astype(dtype)
+        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape).astype(dtype)
     else:
         q_split = q_rot.reshape(*q.shape[:-1], 2, -1)
         k_split = k_rot.reshape(*k.shape[:-1], 2, -1)
         q_rotated = mx.concatenate([
             q_split[..., 0, :] * cos - q_split[..., 1, :] * sin,
             q_split[..., 1, :] * cos + q_split[..., 0, :] * sin,
-        ], axis=-1).astype(q.dtype)
+        ], axis=-1).astype(dtype)
         k_rotated = mx.concatenate([
             k_split[..., 0, :] * cos - k_split[..., 1, :] * sin,
             k_split[..., 1, :] * cos + k_split[..., 0, :] * sin,
-        ], axis=-1).astype(k.dtype)
+        ], axis=-1).astype(dtype)
     if rot_dims is None:
         return q_rotated, k_rotated
     else:
         q_out = mx.concatenate([q_rotated, q_pass], axis=-1)
         k_out = mx.concatenate([k_rotated, k_pass], axis=-1)
         return q_out, k_out
+
+def rotate_half(dtype, _x, cos, sin, rot_dims):
+    x, x_pass = _x[..., :rot_dims], _x[..., rot_dims:]
+    midpoint = x.shape[-1] // 2
+    x1, x2 = x[..., :midpoint], x[..., midpoint:]
+    result = (x * cos) + (mx.concatenate([-x2, x1], axis = -1) * sin)
+    return mx.concatenate([result, x_pass], axis=-1).astype(dtype)
 
 def create_causal_mask(padding_mask):
     padding_mask = mx.array(padding_mask)
@@ -271,47 +304,25 @@ def create_causal_mask(padding_mask):
     causal_mask = causal_matrix & padding_mask[:, None, :]
     # causal_mask = mx.where(causal_matrix & padding_mask[:, None, :], 0.0, -1e9) # additive
     return causal_mask[:, None, :, :]
-
-def measure_performance(start_time, prompt_time, end_time, batch_size, seq_length, gen_length):
-    prompt_duration = prompt_time - start_time
-    generation_duration = end_time - prompt_time
-    tokens_processed = batch_size * seq_length
-    tokens_generated = gen_length * batch_size
-    prompt_throughput = tokens_processed / prompt_duration if prompt_duration > 0 else 0
-    generation_throughput = tokens_generated / generation_duration if generation_duration > 0 else 0
-    metrics = {
-        "prompt_throughput": prompt_throughput,
-        "generation_throughput": generation_throughput,
-        "prompt_tokens": tokens_processed,
-        "prompt_time": prompt_duration,
-        "generation_tokens": tokens_generated,
-        "generation_time": generation_duration
-    }
-    print('=== Benchmarks ===')
-    print(f"Prompt processing: {prompt_throughput:.1f} tokens/sec ({tokens_processed} tokens in {prompt_duration:.1f}s)")
-    print(f"Token generation: {generation_throughput:.1f} tokens/sec ({tokens_generated} tokens in {generation_duration:.1f}s)")
-    return metrics
-
 # }}} === ROPE/CACHE ===
 # {{{ === INFER ===
-
 def infer(
     prompts,
     model,
     tokenizer,
     config,
     lora_path = None,
-    max_new_tokens: int = 100,
-    use_chat_template: bool = True,
+    max_new_tokens = 100,
+    use_chat_template = True,
     custom_tokenizer_fn: Callable = None,
     model_creator: Callable = None,
     stream = True,
     use_scan = False,
     use_jit = True,
     chat_template_kwargs = None,
+    verbose = True,
 ):
 
-    # {{
     if lora_path and os.path.exists(lora_path):
         def decode_metadata(meta):
             out = {}
@@ -326,15 +337,11 @@ def infer(
             return out
         lora_wts, lora_cfg = mx.load(lora_path, return_metadata=True)
         lora_cfg = decode_metadata(lora_cfg)
-        print(f'{lora_cfg=}')
         model.freeze()
-        linear_to_lora_layers(model.model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
+        linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
         model.load_weights(lora_wts, strict=False)
-        # model.load_weights(lora_cfg['wt_from'], strict=False) # option 1
-        # model.load_weights(lora_path, strict=False)           # option 2
         model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
         mx.eval(model)
-    # }}
     model.eval()
     if isinstance(prompts, str):
         prompts = [prompts]
@@ -348,78 +355,66 @@ def infer(
         except Exception as e:
             print(e)
     input_str, input_ids, position_ids, padding_mask = tokenizer(prompts)
-    input_ids = mx.array(input_ids, dtype=mx.int32)
+    input_ids = mx.array(input_ids)
     B, L = input_ids.shape
-    position_ids = mx.array(position_ids, dtype=mx.float32)
+    position_ids = mx.array(position_ids)
     total_len = max_new_tokens + L
     roper = Roper(config, total_len)
     causal_mask = create_causal_mask(padding_mask) # for boolean masking
     causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=False) # for RollCacher
-    # causal_mask = create_causal_mask(padding_mask).astype(config.dtype) # for additive masking
-    # causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=-1e9).astype(config.dtype) # for additive masking
-    # cache = [CatCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)] # for CatCacher
     cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)] # for RollCacher
     zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
-    # zeropad = mx.zeros((B, 1, 1, 1), dtype=config.dtype) # for additive masking
     goon = mx.ones((B, 1), dtype=mx.bool_)
     eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
-    # carry = (input_ids, position_ids, causal_mask, cache, mx.ones((B, 1), dtype=mx.bool_))
     carry = (input_ids, position_ids, causal_mask, mx.ones((B, 1), dtype=mx.bool_))
     mx.eval(model, roper, cache, carry)
-    start_tic = time.perf_counter()
     def scan_step(carry):
-        # input_ids, position_ids, causal_mask, cache, goon = carry
         input_ids, position_ids, causal_mask, goon = carry
         rope = roper(position_ids)
         logits = model(input_ids, causal_mask, rope, cache)
         next_input_ids = mx.argmax(logits[:, -1, :], axis=-1, keepdims=True)
         next_input_ids = mx.where(goon, next_input_ids, eos_id)
-        # new_mask = mx.concat([causal_mask[:, :, -1:, :], zeropad], axis=-1) # for CatCacher
         new_mask = mx.concat([causal_mask[:, :, -1:, 1:], zeropad], axis=-1) # for RollCacher
-        # new_mask = mx.concat([causal_mask[:, :, -1:, :], zeropad], axis=-1)[:,:,:,1:] # for additive masking
         goon = goon & (next_input_ids != eos_id)
         next_position_ids = position_ids[:, -1:] + 1
-        # new_carry = (next_input_ids, next_position_ids, new_mask, cache, goon)
         new_carry = (next_input_ids, next_position_ids, new_mask, goon)
         return new_carry, next_input_ids
-    carry, _output_ids = scan_step(carry)
-    output_ids = [_output_ids]
-    mx.eval(carry)
-    prompt_tic = time.perf_counter()
     if use_jit:
         scan_fn = mx.compile(scan_step, inputs=cache, outputs=cache)
     else:
         scan_fn = scan_step
     eval_every = 30
+    if stream:
+        print(f'┌{PRETTY_HW} Streaming {PRETTY_HW}┐')
+    start_tic = time.perf_counter()
+    carry, _output_ids = scan_step(carry)
+    output_ids = [_output_ids]
+    mx.eval(carry)
+    prompt_tic = time.perf_counter()
     for i in range(max_new_tokens-1):
         carry, _output_ids = scan_fn(carry)
-        # if stream:
-        #     print(tokenizer.decode(_output_ids[-1].tolist()), end='', flush=True)
-        # mx.eval(carry)
+        mx.async_eval(carry, cache)
         if i % eval_every == eval_every-1:
             if stream:
                 print(tokenizer.decode(mx.concat(output_ids[-eval_every:], axis=1)[-1].tolist()), end='', flush=True)
-                stream_buffer = []
-            else:
-                mx.async_eval(carry)
-        # mx.clear_cache()
+            if not mx.any(carry[-1]):
+                break
         output_ids.append(_output_ids)
-        if not mx.any(carry[-1]):
-            break
-    output_ids = mx.concat(output_ids, axis=1).tolist()
-
-    print('\n')
     end_tic = time.perf_counter()
+    output_ids = mx.concat(output_ids, axis=1).tolist()
+    if stream:
+        print(tokenizer.decode(output_ids[-1][-(i%eval_every):]), end='', flush=True)
+        print(f'\n└{PRETTY_HW*2}───────────┘')
+    mx.clear_cache()
     output_str = []
-    pretty_hw = '─'*30
     for i, (i_str, o_ids) in enumerate(zip(input_str, output_ids)):
         o_ids = o_ids[:o_ids.index(eos_id)] if eos_id in o_ids else o_ids
         o_str = tokenizer.decode(o_ids)
         output_str.append(o_str)
-        print(f'┌{pretty_hw} Inp {i:03} {pretty_hw}┐\n{i_str.strip()}\n└{pretty_hw*2}─────────┘\n┌{pretty_hw} Out {i:03} {pretty_hw}┐\n{o_str.strip()}\n└{pretty_hw*2}─────────┘')
-    measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens)
-    return output_str, output_ids
-
+        if verbose:
+            print(f'┌{PRETTY_HW} Inp {i:05} {PRETTY_HW}┐\n{i_str.strip()}\n└{PRETTY_HW*2}───────────┘\n┌{PRETTY_HW} Out {i:05} {PRETTY_HW}┐\n{o_str.strip()}\n└{PRETTY_HW*2}───────────┘')
+    _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
+    return dict(inp_str=input_str, inp_ids=input_ids,out_str=output_str, out_ids=output_ids)
 # }}} === INFER ===
 # {{{ === DORA ===
 class DoRALinear(nn.Module):
@@ -458,13 +453,14 @@ class DoRALinear(nn.Module):
         return z.astype(x.dtype)
 
 def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scale, lora_dropout):
+    _model = model.model
     from mlx.utils import tree_unflatten
     if lora_layers == 'all':
-        lora_layers = model.layers
+        lora_layers = _model.layers
     elif isinstance(lora_layers, int):
-        lora_layers = model.layers[-lora_layers:]
+        lora_layers = _model.layers[-lora_layers:]
     elif isinstance(lora_layers, list):
-        lora_layers = [model.layers[i] for i in lora_layers]
+        lora_layers = [_model.layers[i] for i in lora_layers]
     else:
         raise ValueError("Invalid type for lora_layers. Expected int (number of layers) or list (layer indices or names).")
     def to_lora(layer):
@@ -472,10 +468,8 @@ def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scal
     for l in lora_layers:
         lora_layers = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
         l.update_modules(tree_unflatten(lora_layers))
-
 # }}} === DORA ===
 # {{{ === TRAIN ===
-
 LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
                 thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
 )
@@ -483,7 +477,7 @@ LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, 
 def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, bs=1):
     def loss_fn(model, X, causal_mask, rope, cache, y):
         logits = model(X, causal_mask, rope, cache)
-        return nn.losses.cross_entropy(logits, y, reduction='mean')
+        return nn.losses.cross_entropy(logits, y, reduction='mean') # [] for bs>1 need masking padding&query
 
     # {{
     if lora_cfg is None:
@@ -492,7 +486,7 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
         lora_cfg = lora_cfg|dict(wt_to=strftime_now("%Y%m%d_%H%M%S.safetensors"))
     lora_cfg = LORA_CFG|lora_cfg
     model.freeze()
-    linear_to_lora_layers(model.model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
+    linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
     if lora_cfg['wt_from'] and os.path.exists(lora_cfg['wt_from']):
         model.load_weights(lora_cfg['wt_from'], strict=False)
     model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
@@ -514,17 +508,14 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
         tic_train = time.perf_counter()
         model.train()
         total_loss = num_batches = 0
-        for row in ds: # [] allows bs 1 d/t masking
+        for row in ds: # [] allows only bs=1 d/t masking
             prompt = f"<|im_start|>user\n{row['description'].strip()}\n<|im_end|>\n<|im_start|>assistant\n{row['value'].strip()}\n<|im_end|>"
             input_ids = tokenizer.encode(prompt) # [] mask query
             input_ids = input_ids[:128] # [] ad hoc for crash
             input_ids += [config.eos_token_id]
-            # {{
             total_len = len(input_ids) - 1
-            rope = roper(mx.arange(total_len, dtype=mx.float32)[None,:])
-            # causal_mask = create_causal_mask(mx.ones((1, total_len), dtype=mx.bool_)).astype(config.dtype) # additive
+            rope = roper(mx.arange(total_len)[None,:])
             causal_mask = create_causal_mask(mx.ones((1, total_len), dtype=mx.bool_))
-            # }}
             X = mx.array([input_ids[:-1]])
             y = mx.array([input_ids[1:]])
             loss, grads = loss_and_grad_fn(model, X, causal_mask, rope, cache, y)
@@ -534,16 +525,77 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-5, b
             num_batches += 1
         avg_loss = total_loss / len(ds)
         elp_train = time.perf_counter() - tic_train
-        print(f'{epoch=} {avg_loss=} {elp_train=:.2f}')
+        print(f'{epoch=:5d} {avg_loss=:8.2f} {elp_train=:8.2f}')
         # {{
         model.eval()
-        infer('medium red circle\n', model, tokenizer, config, max_new_tokens=20)
+        _dict_eval = infer('medium red circle\n', model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False)
+        print('└ test output:', _dict_eval['out_str'])
         # }}
 
     from mlx.utils import tree_flatten
     metadata = lora_cfg|dict(wt_from=lora_cfg['wt_to'], wt_to=None)
     metadata = {str(k): v if isinstance(v, str) else json.dumps(v) for k, v in metadata.items() if v is not None}
-    print(f'{metadata=}')
     mx.save_safetensors(lora_cfg['wt_to'], dict(tree_flatten(model.trainable_parameters())), metadata=metadata)
-
+    mx.clear_cache()
 # }}} === TRAIN ===
+
+import numpy as np
+
+
+
+
+def collapse(model, tokenizer, config):
+    collapse_targets = ['self_attn.o_proj']
+    k=8
+    rank=4
+    # ---
+    layers = model.model.layers
+    weights = []
+    for l in layers:
+        weights += [m.weight for k, m in l.named_modules() if k in collapse_targets]
+    n = len(weights)
+    d1, d2 = weights[0].shape
+    W_cat = mx.concatenate(weights, axis=1)
+    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx one as of v0.30.0 doesn't support gpu nor thin svd for svd..
+    U, S, Vt = np.linalg.svd(W_cat.astype(mx.float32), full_matrices=False) # can thin svd but slow af
+    Ws = [np.array(_w.astype(mx.float32)) for _w in weights]
+    print(f'{U.shape=}')
+    print(f'{S.shape=}')
+    print(f'{Vt.shape=}')
+    k_eff = min(k, U.shape[1])
+    U_k = U[:, :k_eff]
+    S_k = S[:k_eff]
+    Vt_k = Vt[:k_eff, :]
+    print(f'{U_k=}')
+    print(f'{S_k=}')
+    print(f'{Vt_k=}')
+    B = U_k * S_k[None,:]
+    print(f'{B=}')
+    Cs = [Vt_k[:, i*d2:(i+1)*d2] for i in range(n)]
+    Rs = []
+    for w, c in zip(Ws, Cs):
+        Rs.append(w - B@c)
+    LoRAs = []
+    for R in Rs:
+        U, S, Vt = np.linalg.svd(R, full_matrices=False)
+        # r_eff = min(rank, U.shape[1])
+        r_eff = max(rank, U.shape[1]) # sanity check
+        if r_eff>0:
+            LoRAs.append([U[:, :r_eff]*S[None, :r_eff], Vt[:r_eff, :]])
+        else:
+            LoRAs.append([0,0])
+    w0_recon = B@Cs[0] + LoRAs[0][0]@LoRAs[0][1]
+    print(f'{Ws[0]=}')
+    print(f'{w0_recon=}')
+
+
+
+
+
+
+
+
+
+
+
+

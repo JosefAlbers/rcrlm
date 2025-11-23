@@ -1,7 +1,4 @@
-# import jax
-# import jax.numpy as jnp
-# from flax import nnx
-from .utils import apply_rope
+from .utils import apply_rope, rotate_half
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -20,6 +17,9 @@ class Attention(nn.Module):
         self.o_proj = nn.Linear(self.n_q_heads * self.head_dim, config.hidden_size, bias=False)
         self.q_norm = nn.RMSNorm(config.head_dim, eps=config.rms_norm_eps)
         self.k_norm = nn.RMSNorm(config.head_dim, eps=config.rms_norm_eps)
+        self.dtype = config.dtype
+        # self.rot_dims = int(self.head_dim * getattr(config, "partial_rotary_factor", 1.0))
+        self.rot_dims = None if getattr(config, "partial_rotary_factor", 1.0)>=1.0 else int(self.head_dim * getattr(config, "partial_rotary_factor", 1.0))
 
     def __call__(self, x, attention_mask, rope, cache):
         B, L, _ = x.shape
@@ -37,7 +37,10 @@ class Attention(nn.Module):
         # q = q.transpose(0, 2, 1, 3)
         # k = k.transpose(0, 2, 1, 3)
         # v = v.transpose(0, 2, 1, 3)
-        q, k = apply_rope(q, k, *rope)
+        q, k = apply_rope(self.dtype, q, k, rope[0], rope[1], rot_dims=self.rot_dims) # {{{
+        # q = rotate_half(self.dtype, q, *rope, rot_dims=self.rot_dims)
+        # k = rotate_half(self.dtype, k, *rope, rot_dims=self.rot_dims)
+        # }}}
         # if cache is not None:
         k, v = cache(k, v)
         o = mx.fast.scaled_dot_product_attention(q,k,v,scale=self.scale,mask=attention_mask) # {{{

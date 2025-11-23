@@ -1,22 +1,30 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train
+from .utils import load_model, load_config, download_repo, infer, train, collapse
 from .qwen3 import Qwen3ForCausalLM
-import argparse
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
 
-def test(task='infer'):
-    lora_test_path = 'test_lora.safetensors'
+def test(task='all'):
     m = load()
-    if task == 'infer':
-        return infer("Write a story about Einstein\n", **m, max_new_tokens=256)
-    if task == 'batch':
-        return infer(["#write a quick sort algorithm\n", "Give me a short introduction to large language model.\n", "Write a neurology ICU admission note.\n", "Comparison of Sortino Ratio for Bitcoin and Ethereum."], **m)
-    if task == 'train':
+    if task == 'infer' or task == 'all':
+        print('〄 Testing vanilla decoding...')
+        _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)
+    if task == 'batch' or task == 'all':
+        print('〄 Testing batch decoding...')
+        _ = infer(["#write a quick sort algorithm\n", "Give me a short introduction to large language model.\n", "Write a neurology ICU admission note.\n", "Comparison of Sortino Ratio for Bitcoin and Ethereum."], **m)
+    if task == 'train' or task == 'all':
+        print('〄 Testing DoRA training...')
+        lora_test_path = 'test_lora.safetensors'
         train("RandomNameAnd6/SVGenerator", **m, lora_cfg=dict(wt_to=lora_test_path))
         del m
+        print('〄 Testing DoRA decoding...')
         m = load()
-        return infer("medium red circle\n", **m, lora_path=lora_test_path)
+        _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False)
+        del m
+    if task == 'collapse' or task == 'all':
+        print('〄 Testing collapse...')
+        m = load()
+        collapse(**m)
 
 def load(model_id='Qwen/Qwen3-0.6B'):
     repo_name, model_name = model_id.split('/')
@@ -28,6 +36,7 @@ def load(model_id='Qwen/Qwen3-0.6B'):
     return dict(model=model, tokenizer=tokenizer, config=model_cfg)
 
 def cli():
+    import argparse
     parser = argparse.ArgumentParser(description="Load a model and generate text.")
     parser.add_argument("-m", "--model", type=str, default='Qwen/Qwen3-0.6B', dest="model_id", help="Model ID in the format 'repo/model_name'.")
     parser.add_argument("-p", "--prompts", type=str, nargs='*', help="Prompt(s) for generation.")
@@ -42,7 +51,7 @@ def cli():
     else:
         args.prompts = "Give me a short introduction to large language model.\n"
     m = load(args.model_id)
-    s, i = infer(
+    _ = infer(
         prompts=args.prompts,
         **m,
         max_new_tokens=args.new,
@@ -51,10 +60,6 @@ def cli():
         use_scan=args.scan,
         use_jit=args.jit
     )
-    # for n, (_s, _i) in enumerate(zip(s, i)):
-    #     print('=== {n} ===')
-    #     print(_s)
-    #     print(_i)
 
 if __name__ == "__main__":
     test()
