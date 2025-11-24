@@ -1,5 +1,5 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train, collapse
+from .utils import load_model, load_config, download_repo, infer, train, collapse, heal
 from .qwen3 import Qwen3ForCausalLM
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
@@ -13,8 +13,8 @@ def test(task='all'):
         print('〄 Testing batch decoding...')
         _ = infer(["#write a quick sort algorithm\n", "Give me a short introduction to large language model.\n", "Write a neurology ICU admission note.\n", "Comparison of Sortino Ratio for Bitcoin and Ethereum."], **m)
     if task == 'train' or task == 'all':
-        print('〄 Testing DoRA training...')
         lora_test_path = 'test_lora.safetensors'
+        print('〄 Testing DoRA training...')
         train("RandomNameAnd6/SVGenerator", **m, lora_cfg=dict(wt_to=lora_test_path))
         del m
         print('〄 Testing DoRA decoding...')
@@ -22,9 +22,15 @@ def test(task='all'):
         _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False, max_new_tokens=256)
         del m
     if task == 'collapse' or task == 'all':
+        heal_test_path = 'test_heal.safetensors'
         print('〄 Testing collapse...')
         m = load()
-        collapse(**m)
+        m['model'] = collapse(m['model'])
+        _ = infer("Write a story about Einstein\n", **m, stream=False)
+        print('〄 Testing healing...')
+        m['model'] = heal("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path)
+        _ = infer("Write a story about Einstein\n", **m, stream=False)
+        del m
 
 def load(model_id='Qwen/Qwen3-0.6B'):
     repo_name, model_name = model_id.split('/')

@@ -8,7 +8,7 @@ requirements = [
 ]
 
 extras_require = {
-    'cuda': ['mlx[cuda]'], 
+    'cuda': ['mlx[cuda]'],
     'cpu':  ['mlx[cpu]'],
     'no_mlx': [],
 }
@@ -17,7 +17,7 @@ setup(
     name='rcrlm',
     url='https://github.com/JosefAlbers/rcrlm',
     packages=find_packages(),
-    version='0.0.1a2',
+    version='0.0.1a3',
     readme="README.md",
     author_email="albersj66@gmail.com",
     description="rcrlm: Collapse layers into a recurrent block",

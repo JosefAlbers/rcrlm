@@ -90,7 +90,7 @@ class Config:
     head_dim: int = None
     attention_bias: bool = True
     mlp_bias: bool = False
-    rope_traditional: bool = True
+    rope_traditional: bool = False
     partial_rotary_factor: float = 1.0
     max_position_embeddings: Optional[int] = None
     original_max_position_embeddings: Optional[int] = None
@@ -131,7 +131,6 @@ def load_config(model_name, cls=Config):
             extra_args[k] = v
     return cls(**init_args, extra_config=extra_args)
 
-
 def load_model(model_cls, model_dir, model_cfg):
     def _get_wt(model_dir, model_cfg):
         if getattr(model_cfg, 'sanitized', False):
@@ -169,8 +168,8 @@ def measure_performance(start_time, prompt_time, end_time, batch_size, seq_lengt
     }
     if verbose:
         print(f'┌{PRETTY_HW} Benchmark {PRETTY_HW}┐')
-        print(f"Prompt processing: {prompt_throughput:8.1f} tokens/sec ({tokens_processed} tokens in {prompt_duration:.1f}s)")
-        print(f"Tokens generation: {generation_throughput:8.1f} tokens/sec ({tokens_generated} tokens in {generation_duration:.1f}s)")
+        print(f"Prompt processing: {prompt_throughput:8.1f} tokens/sec ({tokens_processed:>3d} tokens in {prompt_duration:3.1f}s)")
+        print(f"Tokens generation: {generation_throughput:8.1f} tokens/sec ({tokens_generated:>3d} tokens in {generation_duration:3.1f}s)")
         print(f'└{PRETTY_HW*2}───────────┘')
     return metrics
 # }}} === PREP ===
@@ -192,9 +191,11 @@ class RollCacher(nn.Module):
     def __call__(self, k, v):
         # print(f'{k.shape=}')
         # print(f'{v.shape=}')
-        # self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
-        self.k = self_k = mx.concatenate([self.k[:, :, k.shape[2]:, :], k], axis=2)
-        self.v = self_v = mx.concatenate([self.v[:, :, v.shape[2]:, :], v], axis=2)
+        # self.k = self_k = mx.concatenate([self.k, k], axis=2)[:, :, -self.max_len:, :]
+        # self.v = self_v = mx.concatenate([self.v, v], axis=2)[:, :, -self.max_len:, :]
+        # self.k = self_k = mx.concatenate([self.k[:, :, k.shape[2]:, :], k], axis=2)
+        # self.v = self_v = mx.concatenate([self.v[:, :, v.shape[2]:, :], v], axis=2)
+        self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
         return self_k, self_v
 
 class CatCacher(nn.Module):
@@ -208,9 +209,14 @@ class CatCacher(nn.Module):
         self.v = mx.concat([self.v, v], axis=2)
         return self.k, self.v
 
-class Roper:#(nn.Module):
+@mx.compile
+def get_rope(positions, freq, su_scale):
+    angles = positions[:, None, :, None] * freq
+    return mx.cos(angles) * su_scale, mx.sin(angles) * su_scale
+
+class Roper(nn.Module):
     def __init__(self, config, su_len=None):
-        # super().__init__()
+        super().__init__()
         self.su_scale = 1.0
         if get_nested(config.extra_config, ["rope_scaling", "rope_type"])=='llama3':
             self._llama3(config)
@@ -222,12 +228,11 @@ class Roper:#(nn.Module):
         self.dtype=config.dtype
 
     def __call__(self, positions):
-        positions = positions[:, None, :, None]
-        angles = positions * self.freq
-        # angles = mx.concatenate([angles, angles], axis=-1) # for rotate_half
-        cos = mx.cos(angles) * self.su_scale
-        sin = mx.sin(angles) * self.su_scale
-        # return mx.stop_gradient(cos), mx.stop_gradient(sin)
+        # positions = positions[:, None, :, None]
+        # angles = positions * self.freq
+        # cos = mx.cos(angles) * self.su_scale
+        # sin = mx.sin(angles) * self.su_scale
+        cos, sin = get_rope(positions, self.freq, self.su_scale)
         return cos.astype(self.dtype), sin.astype(self.dtype)
 
     def _llama3(self, config):
@@ -259,7 +264,8 @@ class Roper:#(nn.Module):
         factor = mx.array(factor, dtype=mx.float32)
         self.freq = nnx.Variable(1.0 / (freqs * factor))
 
-def apply_rope(dtype, q, k, cos, sin, rot_dims=None, traditional=False):
+@mx.compile
+def apply_rope(q, k, cos, sin, rot_dims=None, traditional=False):
     if rot_dims is None:
         q_rot, k_rot = q, k
     else:
@@ -270,35 +276,90 @@ def apply_rope(dtype, q, k, cos, sin, rot_dims=None, traditional=False):
         q_odd  = q_rot[..., 1::2]
         k_even = k_rot[..., 0::2]
         k_odd  = k_rot[..., 1::2]
-        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape).astype(dtype)
-        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape).astype(dtype)
+        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape)
+        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape)
     else:
         q_split = q_rot.reshape(*q.shape[:-1], 2, -1)
         k_split = k_rot.reshape(*k.shape[:-1], 2, -1)
         q_rotated = mx.concatenate([
             q_split[..., 0, :] * cos - q_split[..., 1, :] * sin,
             q_split[..., 1, :] * cos + q_split[..., 0, :] * sin,
-        ], axis=-1).astype(dtype)
+        ], axis=-1)
         k_rotated = mx.concatenate([
             k_split[..., 0, :] * cos - k_split[..., 1, :] * sin,
             k_split[..., 1, :] * cos + k_split[..., 0, :] * sin,
-        ], axis=-1).astype(dtype)
+        ], axis=-1)
     if rot_dims is None:
-        return q_rotated, k_rotated
+        return q_rotated.astype(q.dtype), k_rotated.astype(k.dtype)
     else:
-        q_out = mx.concatenate([q_rotated, q_pass], axis=-1)
-        k_out = mx.concatenate([k_rotated, k_pass], axis=-1)
+        q_out = mx.concatenate([q_rotated.astype(q.dtype), q_pass], axis=-1)
+        k_out = mx.concatenate([k_rotated.astype(k.dtype), k_pass], axis=-1)
         return q_out, k_out
 
-def rotate_half(dtype, _x, cos, sin, rot_dims):
-    x, x_pass = _x[..., :rot_dims], _x[..., rot_dims:]
-    midpoint = x.shape[-1] // 2
-    x1, x2 = x[..., :midpoint], x[..., midpoint:]
-    result = (x * cos) + (mx.concatenate([-x2, x1], axis = -1) * sin)
-    return mx.concatenate([result, x_pass], axis=-1).astype(dtype)
+def create_rope_applier(rot_dims=None, traditional=False):
+    def _apply_rope_None_True(q, k, cos, sin, rot_dims):
+        q_rot, k_rot = q, k
+        q_even = q_rot[..., 0::2]
+        q_odd  = q_rot[..., 1::2]
+        k_even = k_rot[..., 0::2]
+        k_odd  = k_rot[..., 1::2]
+        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape)
+        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape)
+        return q_rotated.astype(q.dtype), k_rotated.astype(k.dtype)
+    def _apply_rope_dim_True(q, k, cos, sin, rot_dims):
+        q_rot, q_pass = q[..., :rot_dims], q[..., rot_dims:]
+        k_rot, k_pass = k[..., :rot_dims], k[..., rot_dims:]
+        q_even = q_rot[..., 0::2]
+        q_odd  = q_rot[..., 1::2]
+        k_even = k_rot[..., 0::2]
+        k_odd  = k_rot[..., 1::2]
+        q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape)
+        k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape)
+        q_out = mx.concatenate([q_rotated.astype(q.dtype), q_pass], axis=-1)
+        k_out = mx.concatenate([k_rotated.astype(k.dtype), k_pass], axis=-1)
+        return q_out, k_out
+    def _apply_rope_dim_False(q, k, cos, sin, rot_dims):
+        q_rot, q_pass = q[..., :rot_dims], q[..., rot_dims:]
+        k_rot, k_pass = k[..., :rot_dims], k[..., rot_dims:]
+        q_split = q_rot.reshape(*q.shape[:-1], 2, -1)
+        k_split = k_rot.reshape(*k.shape[:-1], 2, -1)
+        q_rotated = mx.concatenate([
+            q_split[..., 0, :] * cos - q_split[..., 1, :] * sin,
+            q_split[..., 1, :] * cos + q_split[..., 0, :] * sin,
+        ], axis=-1)
+        k_rotated = mx.concatenate([
+            k_split[..., 0, :] * cos - k_split[..., 1, :] * sin,
+            k_split[..., 1, :] * cos + k_split[..., 0, :] * sin,
+        ], axis=-1)
+        q_out = mx.concatenate([q_rotated.astype(q.dtype), q_pass], axis=-1)
+        k_out = mx.concatenate([k_rotated.astype(k.dtype), k_pass], axis=-1)
+        return q_out, k_out
+    def _apply_rope_None_False(q, k, cos, sin, rot_dims):
+        q_rot, k_rot = q, k
+        q_split = q_rot.reshape(*q.shape[:-1], 2, -1)
+        k_split = k_rot.reshape(*k.shape[:-1], 2, -1)
+        q_rotated = mx.concatenate([
+            q_split[..., 0, :] * cos - q_split[..., 1, :] * sin,
+            q_split[..., 1, :] * cos + q_split[..., 0, :] * sin,
+        ], axis=-1)
+        k_rotated = mx.concatenate([
+            k_split[..., 0, :] * cos - k_split[..., 1, :] * sin,
+            k_split[..., 1, :] * cos + k_split[..., 0, :] * sin,
+        ], axis=-1)
+        return q_rotated.astype(q.dtype), k_rotated.astype(k.dtype)
+    if traditional:
+        if rot_dims is None:
+            return _apply_rope_None_True
+        else:
+            return _apply_rope_dim_True
+    if not traditional:
+        if rot_dims is None:
+            return _apply_rope_None_False
+        else:
+            return _apply_rope_dim_False
 
 def create_causal_mask(padding_mask):
-    padding_mask = mx.array(padding_mask)
+    padding_mask = mx.array(padding_mask, dtype=mx.bool_)
     seq_length = padding_mask.shape[1]
     causal_matrix = mx.tril(mx.ones((seq_length, seq_length), dtype=mx.bool_))
     causal_mask = causal_matrix & padding_mask[:, None, :]
@@ -367,43 +428,49 @@ def infer(
     goon = mx.ones((B, 1), dtype=mx.bool_)
     eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
     carry = (input_ids, position_ids, causal_mask, mx.ones((B, 1), dtype=mx.bool_))
-    mx.eval(model, roper, cache, carry)
-    def scan_step(carry):
-        input_ids, position_ids, causal_mask, goon = carry
-        rope = roper(position_ids)
-        logits = model(input_ids, causal_mask, rope, cache)
-        next_input_ids = mx.argmax(logits[:, -1, :], axis=-1, keepdims=True)
-        next_input_ids = mx.where(goon, next_input_ids, eos_id)
-        new_mask = mx.concat([causal_mask[:, :, -1:, 1:], zeropad], axis=-1) # for RollCacher
-        goon = goon & (next_input_ids != eos_id)
-        next_position_ids = position_ids[:, -1:] + 1
-        new_carry = (next_input_ids, next_position_ids, new_mask, goon)
+    mx.eval(model, roper, cache, carry, zeropad)
+    def scan_step(prev_carry):
+        prev_input_ids, prev_position_ids, prev_mask, prev_goon = prev_carry
+        rope = roper(prev_position_ids)
+        logits = model(prev_input_ids, prev_mask, rope, cache)
+        next_input_ids = mx.where(prev_goon, mx.argmax(logits[:, -1, :], axis=-1, keepdims=True), eos_id)
+        new_mask = mx.concat([prev_mask[:, :, -1:, 1:], zeropad], axis=-1) # for RollCacher
+        new_goon = prev_goon & (next_input_ids != eos_id)
+        next_position_ids = prev_position_ids[:, -1:] + 1
+        new_carry = (next_input_ids, next_position_ids, new_mask, new_goon)
         return new_carry, next_input_ids
     if use_jit:
         scan_fn = mx.compile(scan_step, inputs=cache, outputs=cache)
     else:
         scan_fn = scan_step
-    eval_every = 30
     if stream:
         print(f'┌{PRETTY_HW} Streaming {PRETTY_HW}┐')
+    eval_every = 64
+    nbuf=eval_every//2
+    ntok=1
     start_tic = time.perf_counter()
-    carry, _output_ids = scan_step(carry)
-    output_ids = [_output_ids]
+    carry, _oid = scan_step(carry)
     mx.eval(carry)
+    # output_ids = [carry[0]]
+    output_ids = [_oid]
     prompt_tic = time.perf_counter()
     for i in range(max_new_tokens-1):
-        carry, _output_ids = scan_fn(carry)
-        mx.async_eval(carry, cache)
+        carry, _oid = scan_fn(carry)
+        # output_ids.append(carry[0])
+        output_ids.append(_oid)
+        ntok+=1
         if i % eval_every == eval_every-1:
             if stream:
-                print(tokenizer.decode(mx.concat(output_ids[-eval_every:], axis=1)[-1].tolist()), end='', flush=True)
+                print(tokenizer.decode(mx.concat(output_ids[-ntok-nbuf:-nbuf], axis=1)[-1].tolist()), end='', flush=True)
+                ntok=0
+            else:
+                mx.async_eval(carry)
             if not mx.any(carry[-1]):
                 break
-        output_ids.append(_output_ids)
     end_tic = time.perf_counter()
     output_ids = mx.concat(output_ids, axis=1).tolist()
     if stream:
-        print(tokenizer.decode(output_ids[-1][-(i%eval_every):]), end='', flush=True)
+        print(tokenizer.decode(output_ids[-1][-ntok-nbuf:]), end='', flush=True)
         print(f'\n└{PRETTY_HW*2}───────────┘')
     mx.clear_cache()
     output_str = []
@@ -466,19 +533,14 @@ def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scal
     def to_lora(layer):
         return DoRALinear.from_linear(layer, r=lora_rank, alpha=lora_rank, scale=lora_scale, dropout=lora_dropout)
     for l in lora_layers:
-        lora_layers = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
-        l.update_modules(tree_unflatten(lora_layers))
+        loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
+        l.update_modules(tree_unflatten(loralized))
 # }}} === DORA ===
 # {{{ === TRAIN ===
-LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
-                thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
-)
-
-def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-4, bs=2, sl=1024):
-    def loss_fn(model, X, causal_mask, rope, cache, y, label_mask):
-        logits = model(X, causal_mask, rope, cache)
-        ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
-        return ce.astype(mx.float32).sum() / label_mask.sum()
+def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, lora_cfg=None):
+    LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
+                    thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
+    )
 
     if lora_cfg is None:
         lora_cfg = {}
@@ -489,13 +551,26 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-4, b
     linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
     if lora_cfg['wt_from'] and os.path.exists(lora_cfg['wt_from']):
         model.load_weights(lora_cfg['wt_from'], strict=False)
-    model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
-    mx.eval(model)
-    model.train()
+    model.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(tuple(lora_cfg['thaws'])) else None)
     from datasets import load_dataset
     ds = load_dataset(ds_id, split="train").to_list()
     ds = ds[:100]
-    n_steps = n_epochs * len(ds) / bs
+    ds = [dict(str_i=_r['description'], str_o=_r['value']) for _r in ds]
+    model = _train(ds, model, tokenizer, config, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl)
+    from mlx.utils import tree_flatten
+    metadata = lora_cfg|dict(wt_from=lora_cfg['wt_to'], wt_to=None)
+    metadata = {str(k): v if isinstance(v, str) else json.dumps(v) for k, v in metadata.items() if v is not None}
+    mx.save_safetensors(lora_cfg['wt_to'], dict(tree_flatten(model.trainable_parameters())), metadata=metadata)
+    mx.clear_cache()
+    return model
+
+def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
+    def loss_fn(model, X, causal_mask, rope, cache, y, label_mask):
+        logits = model(X, causal_mask, rope, cache)
+        ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
+        return ce.astype(mx.float32).sum() / label_mask.sum()
+    mx.eval(model)
+    n_steps = n_epochs * len(ds) // bs
     import mlx.optimizers as optim
     lr_schedule = optim.cosine_decay(lr, n_steps, 0.0)
     optimizer = optim.Adam(learning_rate=lr_schedule)
@@ -518,8 +593,8 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-4, b
             _lms = []
             _ams = []
             for row in batch_rows:
-                str_i = f"<|im_start|>user\n{row['description'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
-                str_o = f"{row['value'].strip()}\n<|im_end|>"
+                str_i = f"<|im_start|>user\n{row['str_i'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
+                str_o = f"{row['str_o'].strip()}\n<|im_end|>"
                 iid_i = tokenizer.encode(str_i)
                 iid_o = tokenizer.encode(str_o) + [eos_id]
                 input_ids = iid_i + iid_o
@@ -555,52 +630,49 @@ def train(ds_id, model, tokenizer, config, lora_cfg=None, n_epochs=2, lr=1e-4, b
         mx.eval(model)
         _dict_eval = infer(test_prompt, model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False, use_chat_template=False)
         print('└ test output:', _dict_eval['out_str'])
+    return model
 
-    from mlx.utils import tree_flatten
-    metadata = lora_cfg|dict(wt_from=lora_cfg['wt_to'], wt_to=None)
-    metadata = {str(k): v if isinstance(v, str) else json.dumps(v) for k, v in metadata.items() if v is not None}
-    mx.save_safetensors(lora_cfg['wt_to'], dict(tree_flatten(model.trainable_parameters())), metadata=metadata)
-    mx.clear_cache()
 # }}} === TRAIN ===
 # {{{ === SVD ===
-import numpy as np
-
-def collapse(model, tokenizer, config):
-    collapse_targets = ['self_attn.o_proj']
-    k=8
-    rank=4
+def svdlora(model, tokenizer, config, collapse_cfg=None):
+    import numpy as np
+    COLLAPSE_CFG = dict(k=256, rank=32, targets=['self_attn.v_proj'])
+    if collapse_cfg is None:
+        collapse_cfg = {}
+    collapse_cfg = COLLAPSE_CFG|collapse_cfg
+    targets = collapse_cfg['targets']
+    k=collapse_cfg['k']
+    rank=collapse_cfg['rank']
     # ---
+    tic_clp = time.perf_counter()
     layers = model.model.layers
-    weights = []
+    Ws = []
     for l in layers:
-        weights += [m.weight for k, m in l.named_modules() if k in collapse_targets]
-    n = len(weights)
-    d1, d2 = weights[0].shape
-    W_cat = mx.concatenate(weights, axis=1)
-    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx one as of v0.30.0 doesn't support gpu nor thin svd for svd..
+        Ws += [m.weight for k, m in l.named_modules() if k in targets]
+    n = len(Ws)
+    d1, d2 = Ws[0].shape
+    print(f'{d1=}')
+    print(f'{d2=}')
+    W_cat = mx.concatenate(Ws, axis=1)
+    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx svd as of v0.30.0 doesn't support gpu nor thinning; also crashes too..
+    # mx.eval(U, S, Vt)
     U, S, Vt = np.linalg.svd(W_cat.astype(mx.float32), full_matrices=False) # can thin svd but slow af
-    Ws = [np.array(_w.astype(mx.float32)) for _w in weights]
-    print(f'{U.shape=}')
-    print(f'{S.shape=}')
-    print(f'{Vt.shape=}')
-    k_eff = min(k, U.shape[1])
+    Ws = [np.array(_w.astype(mx.float32)) for _w in Ws]
+    k_eff = min(k, d1)
     U_k = U[:, :k_eff]
     S_k = S[:k_eff]
     Vt_k = Vt[:k_eff, :]
-    print(f'{U_k=}')
-    print(f'{S_k=}')
-    print(f'{Vt_k=}')
     B = U_k * S_k[None,:]
-    print(f'{B=}')
     Cs = [Vt_k[:, i*d2:(i+1)*d2] for i in range(n)]
     Rs = []
     for w, c in zip(Ws, Cs):
         Rs.append(w - B@c)
     LoRAs = []
     for R in Rs:
+        # U, S, Vt = mx.linalg.svd(R, stream=mx.cpu)
         U, S, Vt = np.linalg.svd(R, full_matrices=False)
-        # r_eff = min(rank, U.shape[1])
-        r_eff = max(rank, U.shape[1]) # sanity check
+        # r_eff = min(rank, d1)
+        r_eff = d1 # sanity check
         if r_eff>0:
             LoRAs.append([U[:, :r_eff]*S[None, :r_eff], Vt[:r_eff, :]])
         else:
@@ -608,4 +680,52 @@ def collapse(model, tokenizer, config):
     w0_recon = B@Cs[0] + LoRAs[0][0]@LoRAs[0][1]
     print(f'{Ws[0]=}')
     print(f'{w0_recon=}')
+    elp_clp = time.perf_counter() - tic_clp
+    print(f'{elp_clp=:.1f}')
 # }}} === SVD ===
+class RecurrentBlock(nn.Module):
+    def __init__(self, layer, n_rcr=3):
+        super().__init__()
+        self.layer = layer
+        self.n_rcr = n_rcr
+
+    def __call__(self, x, attention_mask, rope, cache):
+        for _ in range(self.n_rcr):
+            h = self.layer(x, attention_mask, rope, cache)
+            x = x + h # [] to use mem token prepended across recurrence and sum token appended to pass on instead of abusing cache (as of now is saltating x n_rcr); also concat and mlp instead of adding on
+        return x
+
+def collapse(model):
+    target_layer = model.model.layers[13]
+    recurrent_block = RecurrentBlock(target_layer, n_rcr=3)
+    new_layers = []
+    for i, layer in enumerate(model.model.layers):
+        if i == 12:
+            new_layers.append(recurrent_block)
+        elif i in [13, 14, 15, 16]: # [] svd 
+            continue
+        else:
+            new_layers.append(layer)
+    model.model.layers = new_layers
+    return model
+
+def heal(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-6, bs=2, sl=1024, to='saved_heal.safetensors'):
+    from mlx.utils import tree_unflatten
+    model.freeze()
+    def to_lora(layer):
+        return DoRALinear.from_linear(layer, r=32, alpha=32, scale=0.01, dropout=0.0)
+    for l in model.model.layers:
+        if getattr(l, 'n_rcr', None):
+            loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
+            l.update_modules(tree_unflatten(loralized))
+            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
+    from datasets import load_dataset
+    ds = load_dataset(ds_id, split="test").to_list()
+    ds = ds[:100]
+    ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
+    model = _train(ds, model, tokenizer, config, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl) # [] to do reverse kld on last hidden states from recurrent block
+    from mlx.utils import tree_flatten
+    mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save layers removed, replaced, n_rcr, etc
+    mx.clear_cache()
+    return model
+
