@@ -50,8 +50,6 @@ Tokens generation:    217.3 tokens/sec (100 tokens in 0.5s)
 
 `rcr-lm` achieves generation speeds exceeding 200 tokens/sec, offering a measurable performance uplift over standard MLX implementations.
 
-#### rcr-lm
-
 ```python
 from rcrlm import load, infer
 m = load()
