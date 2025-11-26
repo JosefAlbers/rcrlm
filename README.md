@@ -9,7 +9,7 @@ A lightweight, high-performance research framework for Large Language Models bui
 `rcr-lm` is available on PyPI:
 
 ```bash
-# macOS (Apple Silicon)
+# macOS
 pip install rcrlm
 
 # Linux with CUDA
@@ -156,6 +156,7 @@ eval_lm(**m, tasks=["mmlu", "gpqa", "gsm8k", "mgsm_direct", "mbpp", "humaneval"]
 teacher = load()['model']
 m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
 eval_lm(**m, tasks=["mmlu", "gpqa", "gsm8k", "mgsm_direct", "mbpp", "humaneval"])
+del teacher, m
 ```
 
 <details><summary>Codes adapted from [nnx-lm](https://pypi.org/project/nnx-lm/) to try some stuff</summary><pre>

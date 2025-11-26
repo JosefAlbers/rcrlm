@@ -4,7 +4,7 @@ from .qwen3 import Qwen3ForCausalLM
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
 
-def test(task='all'):
+def test(task='collapse'):
     m = load()
     if task == 'infer' or task == 'all':
         print('〄 Testing vanilla decoding...')

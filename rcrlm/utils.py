@@ -565,9 +565,10 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, tea
         logits = model(X, causal_mask, rope, cache)
         if teacher is not None:
             teacher_logits = mx.stop_gradient(teacher(X, causal_mask, rope, cache))
-            p_teacher = nn.softmax(teacher_logits / temperature, axis=-1)
             log_p_student = nn.log_softmax(logits / temperature, axis=-1)
-            kld_loss = -mx.sum(p_teacher * log_p_student, axis=-1)
+            log_p_teacher = nn.log_softmax(teacher_logits / temperature, axis=-1)
+            p_student = mx.exp(log_p_student) 
+            kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
             loss_masked = kld_loss * label_mask
             return (loss_masked.sum() / label_mask.sum()) * (temperature ** 2)
         else:

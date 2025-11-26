@@ -18,7 +18,7 @@ setup(
     name='rcrlm',
     url='https://github.com/JosefAlbers/rcrlm',
     packages=find_packages(),
-    version='0.0.1a6',
+    version='0.0.1',
     readme="README.md",
     author_email="albersj66@gmail.com",
     description="rcr-lm: Collapse layers into a recurrent block",
