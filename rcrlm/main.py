@@ -1,5 +1,5 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train, collapse, heal
+from .utils import load_model, load_config, download_repo, infer, train, collapse, distill
 from .qwen3 import Qwen3ForCausalLM
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
@@ -19,7 +19,7 @@ def test(task='all'):
         del m
         print('〄 Testing DoRA decoding...')
         m = load()
-        _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False, max_new_tokens=256)
+        _ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False, max_new_tokens=256, use_jit=False)
         del m
     if task == 'collapse' or task == 'all':
         heal_test_path = 'test_heal.safetensors'
@@ -28,9 +28,23 @@ def test(task='all'):
         m['model'] = collapse(m['model'])
         _ = infer("Write a story about Einstein\n", **m, stream=False)
         print('〄 Testing healing...')
-        m['model'] = heal("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path)
+        teacher = load()['model']
+        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
         _ = infer("Write a story about Einstein\n", **m, stream=False)
-        del m
+        del teacher, m
+    if task == 'eval' or task == 'all':
+        print('〄 Testing lm-eval on original model...')
+        from .evals import eval_lm
+        m = load()
+        eval_lm(**m)
+        print('〄 Testing lm-eval on collapsed model...')
+        m['model'] = collapse(m['model'])
+        eval_lm(**m)
+        print('〄 Testing lm-eval on healed model...')
+        teacher = load()['model']
+        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
+        eval_lm(**m)
+        del teacher, m
 
 def load(model_id='Qwen/Qwen3-0.6B'):
     repo_name, model_name = model_id.split('/')

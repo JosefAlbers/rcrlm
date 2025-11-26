@@ -139,16 +139,7 @@ def load_model(model_cls, model_dir, model_cfg):
 
     model = model_cls(model_cfg)
     model.load_weights(_get_wt(model_dir, model_cfg), strict=False)
-    # # {{
-    # if lora_cfg:
-    #     model.freeze()
-    #     linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
-    #     if lora_cfg['wt_from'] and os.path.exists(lora_cfg['wt_from']):
-    #         model.load_weights(lora_cfg['wt_from'], strict=False)
-    #     model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
-    # # }}
     mx.eval(model)
-    # model.eval()
     return model
 
 def measure_performance(start_time, prompt_time, end_time, batch_size, seq_length, gen_length, verbose=True):
@@ -187,16 +178,20 @@ class RollCacher(nn.Module):
         self.max_len = max_len
         self.k = mx.zeros((batch_size, num_heads, max_len, head_dim), dtype=dtype) if k is None else k
         self.v = mx.zeros((batch_size, num_heads, max_len, head_dim), dtype=dtype) if v is None else v
+        self.dtype=dtype
 
     def __call__(self, k, v):
-        # print(f'{k.shape=}')
-        # print(f'{v.shape=}')
         # self.k = self_k = mx.concatenate([self.k, k], axis=2)[:, :, -self.max_len:, :]
         # self.v = self_v = mx.concatenate([self.v, v], axis=2)[:, :, -self.max_len:, :]
         # self.k = self_k = mx.concatenate([self.k[:, :, k.shape[2]:, :], k], axis=2)
         # self.v = self_v = mx.concatenate([self.v[:, :, v.shape[2]:, :], v], axis=2)
         self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
         return self_k, self_v
+
+    def rollback(self, len_back):
+        self.k = mx.roll(self.k, shift=len_back, axis=2)
+        self.v = mx.roll(self.v, shift=len_back, axis=2)
+
 
 class CatCacher(nn.Module):
     def __init__(self, dtype, batch_size, num_heads, max_len, head_dim, k=None, v=None):
@@ -383,7 +378,6 @@ def infer(
     chat_template_kwargs = None,
     verbose = True,
 ):
-
     if lora_path and os.path.exists(lora_path):
         def decode_metadata(meta):
             out = {}
@@ -541,7 +535,6 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
     LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
                     thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
     )
-
     if lora_cfg is None:
         lora_cfg = {}
     if 'wt_to' not in lora_cfg:
@@ -564,11 +557,22 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
     mx.clear_cache()
     return model
 
-def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
-    def loss_fn(model, X, causal_mask, rope, cache, y, label_mask):
+def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, teacher=None, temperature=1.0):
+    cache = [lambda x,y: (x,y)]*config.num_hidden_layers
+    if teacher is not None:
+        teacher.freeze()
+    def loss_fn(model, X, causal_mask, rope, y, label_mask):
         logits = model(X, causal_mask, rope, cache)
-        ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
-        return ce.astype(mx.float32).sum() / label_mask.sum()
+        if teacher is not None:
+            teacher_logits = mx.stop_gradient(teacher(X, causal_mask, rope, cache))
+            p_teacher = nn.softmax(teacher_logits / temperature, axis=-1)
+            log_p_student = nn.log_softmax(logits / temperature, axis=-1)
+            kld_loss = -mx.sum(p_teacher * log_p_student, axis=-1)
+            loss_masked = kld_loss * label_mask
+            return (loss_masked.sum() / label_mask.sum()) * (temperature ** 2)
+        else:
+            ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
+            return ce.astype(mx.float32).sum() / label_mask.sum()
     mx.eval(model)
     n_steps = n_epochs * len(ds) // bs
     import mlx.optimizers as optim
@@ -576,8 +580,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
     optimizer = optim.Adam(learning_rate=lr_schedule)
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     roper = Roper(config)
-    mx.eval(roper, model, optimizer)
-    cache = [lambda x,y: (x,y)]*config.num_hidden_layers
+    mx.eval(roper, model, optimizer, teacher)
     test_prompt = f"<|im_start|>user\nmedium red circle\n<|im_end|>\n<|im_start|>assistant\n"
     eos_id = config.eos_token_id
     import random
@@ -586,7 +589,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
         model.train()
         total_loss = num_batches = 0
         ds = random.sample(ds, len(ds))
-        for i in range(0, len(ds), bs): # [] allows only bs=1 d/t masking
+        for i in range(0, len(ds), bs): 
             batch_rows = ds[i:i+bs]
             _Xs = []
             _ys = []
@@ -618,7 +621,14 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
                 attention_mask.append(_ams[e]+[False]*_pad_len)
             rope = roper(mx.array([list(range(_seq_len))]*len(_ams)))
             causal_mask = create_causal_mask(attention_mask)
-            loss, grads = loss_and_grad_fn(model, mx.array(X), causal_mask, rope, cache, mx.array(y), mx.array(label_mask))
+            loss, grads = loss_and_grad_fn(
+                model, 
+                mx.array(X), 
+                causal_mask, 
+                rope, 
+                mx.array(y), 
+                mx.array(label_mask),
+            )
             optimizer.update(model, grads)
             mx.eval(loss, model, optimizer)
             total_loss += loss.item()
@@ -630,6 +640,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024):
         mx.eval(model)
         _dict_eval = infer(test_prompt, model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False, use_chat_template=False)
         print('└ test output:', _dict_eval['out_str'])
+        
     return model
 
 # }}} === TRAIN ===
@@ -684,38 +695,46 @@ def svdlora(model, tokenizer, config, collapse_cfg=None):
     print(f'{elp_clp=:.1f}')
 # }}} === SVD ===
 class RecurrentBlock(nn.Module):
-    def __init__(self, layer, n_rcr=3):
+    def __init__(self, layer, n_rcr=3, dim=None):
         super().__init__()
         self.layer = layer
         self.n_rcr = n_rcr
 
-    def __call__(self, x, attention_mask, rope, cache):
-        for _ in range(self.n_rcr):
-            h = self.layer(x, attention_mask, rope, cache)
-            x = x + h # [] to use mem token prepended across recurrence and sum token appended to pass on instead of abusing cache (as of now is saltating x n_rcr); also concat and mlp instead of adding on
+    def __call__(self, x, attention_mask=None, rope=None, cache=None):
+        B, L, D = x.shape
+        for i in range(self.n_rcr):
+            if getattr(cache, "rollback", None):
+                cache.rollback(L*(i>0))
+            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache)
         return x
 
 def collapse(model):
-    target_layer = model.model.layers[13]
-    recurrent_block = RecurrentBlock(target_layer, n_rcr=3)
+    target_indices = [13, 14, 15]
+    primary_idx = 13
+    layers = model.model.layers
+    W_avg = {}
+    ref_layer = model.model.layers[primary_idx]
+    dim = ref_layer.input_layernorm.weight.shape[0]
+    rec_block = RecurrentBlock(ref_layer, n_rcr=len(target_indices), dim=dim)
     new_layers = []
-    for i, layer in enumerate(model.model.layers):
-        if i == 12:
-            new_layers.append(recurrent_block)
-        elif i in [13, 14, 15, 16]: # [] svd 
+    for i, layer in enumerate(layers):
+        if i == primary_idx:
+            new_layers.append(rec_block)
+        elif i in target_indices:
             continue
         else:
             new_layers.append(layer)
     model.model.layers = new_layers
     return model
 
-def heal(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-6, bs=2, sl=1024, to='saved_heal.safetensors'):
+def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=2, lr=1e-6, bs=2, sl=1024, to='distilled.safetensors'):
     from mlx.utils import tree_unflatten
     model.freeze()
     def to_lora(layer):
         return DoRALinear.from_linear(layer, r=32, alpha=32, scale=0.01, dropout=0.0)
     for l in model.model.layers:
         if getattr(l, 'n_rcr', None):
+            # print([k for k, m in l.named_modules() if k.endswith('proj')])
             loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
             l.update_modules(tree_unflatten(loralized))
             l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
@@ -723,9 +742,9 @@ def heal(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-6, bs=2, sl=1024, to
     ds = load_dataset(ds_id, split="test").to_list()
     ds = ds[:100]
     ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
-    model = _train(ds, model, tokenizer, config, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl) # [] to do reverse kld on last hidden states from recurrent block
+    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl)
     from mlx.utils import tree_flatten
-    mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save layers removed, replaced, n_rcr, etc
+    mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
     mx.clear_cache()
     return model
 

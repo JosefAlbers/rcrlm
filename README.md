@@ -1,13 +1,59 @@
+# rcr-lm
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1XYyO04by5UCaMoH0C2MUmsLPOwddN5Gp?usp=sharing)
 
-# Accelerated LLM inference
+A lightweight, high-performance research framework for Large Language Models built on Apple's [MLX](https://github.com/ml-explore/mlx).
 
-`rcr-lm` generates tokens at 200+ tokens/sec, significantly outperforming `mlx-lm`'s 175 token/sec:
+## Quickstart
 
-## rcrlm
+`rcr-lm` is available on PyPI:
+
+```bash
+# macOS (Apple Silicon)
+pip install rcrlm
+
+# Linux with CUDA
+pip install rcrlm[cuda]
+
+# Linux (CPU only)
+pip install rcrlm[cpu]
+```
+
+To generate text with an LLM:
+
+```bash
+>>> rlm
+
+┌────────────────────────────── Streaming ──────────────────────────────┐
+<think>
+Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Inp 00000 ──────────────────────────────┐
+<|im_start|>user
+Give me a short introduction to large language model.
+<|im_end|>
+<|im_start|>assistant
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+<think>
+Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Benchmark ──────────────────────────────┐
+Prompt processing:    298.1 tokens/sec ( 18 tokens in 0.1s)
+Tokens generation:    217.3 tokens/sec (100 tokens in 0.5s)
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+## Key Features
+
+### Accelerated Inference
+
+`rcr-lm` achieves generation speeds exceeding 200 tokens/sec, offering a measurable performance uplift over standard MLX implementations.
+
+#### rcr-lm
 
 ```python
-from rcrlm import load, generate
+from rcrlm import load, infer
 m = load()
 _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)
 ```
@@ -48,7 +94,7 @@ Tokens generation:    200.3 tokens/sec (256 tokens in 1.3s)
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-## mlx-lm
+#### mlx-lm (for comparison)
 
 ```python
 from mlx_lm import load, generate
@@ -74,8 +120,48 @@ Generation: 256 tokens, 174.251 tokens-per-sec
 Peak memory: 1.415 GB
 ```
 
-<details><summary>WIP (adapted codes from [nnx-lm](https://pypi.org/project/nnx-lm/) to try some stuff)</summary><pre>
-# Etc
+### Efficient Fine-Tuning
+
+Supports DoRA (Weight-Decomposed Low-Rank Adaptation) for parameter-efficient training workflows.
+
+```python
+from rcrlm import load, train, infer
+m = load()
+lora_test_path = 'test_lora.safetensors'
+train("RandomNameAnd6/SVGenerator", **m, lora_cfg=dict(wt_to=lora_test_path))
+del m
+m = load()
+_ = infer("medium red circle\n", **m, lora_path=lora_test_path, stream=False, max_new_tokens=256, use_jit=False)
+```
+
+Also supports Knowledge Distillation (reverse KLD) from a teacher model.
+
+```python
+m = load()
+m['model'] = collapse(m['model'])
+_ = infer("Write a story about Einstein\n", **m, stream=False)
+teacher = load()['model']
+m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
+_ = infer("Write a story about Einstein\n", **m, stream=False)
+```
+
+### Integrated Evaluation
+
+Native integration with `lm-evaluation-harness`. Benchmark vanilla and customized models against standard metrics (MMLU, GSM8K, etc.) with a single command.
+
+```python
+from rcrlm.evals import eval_lm
+m = load()
+eval_lm(**m, tasks=["mmlu", "gpqa", "gsm8k", "mgsm_direct", "mbpp", "humaneval"])
+m['model'] = collapse(m['model'])
+eval_lm(**m, tasks=["mmlu", "gpqa", "gsm8k", "mgsm_direct", "mbpp", "humaneval"])
+teacher = load()['model']
+m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
+eval_lm(**m, tasks=["mmlu", "gpqa", "gsm8k", "mgsm_direct", "mbpp", "humaneval"])
+```
+
+<details><summary>Codes adapted from [nnx-lm](https://pypi.org/project/nnx-lm/) to try some stuff</summary><pre>
+## Etc
 
 ```
 >>> import rcrlm
@@ -113,8 +199,8 @@ I should include some quotes or references to his work. Maybe mention his quote 
 Wait, the user might want the story to be engaging and highlight his legacy. I need to make sure the story flows well, with a good narrative arc. Avoid clichÃ©s, but still capture his essence. Check for any inaccuracies, like his actual birth date and death year. Let me confirm: Einstein was born on April 14, 18
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    247.8 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    200.2 tokens/sec (256 tokens in 1.3s)
+Prompt processing:    245.6 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    200.6 tokens/sec (256 tokens in 1.3s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing batch decoding...
 ┌────────────────────────────── Streaming ──────────────────────────────┐
@@ -142,7 +228,8 @@ Give me a short introduction to large language model.
 <|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00001 ──────────────────────────────┐
-<think>                                                                                                                                                                                                             Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need
+<think>
+Okay, the user wants a short introduction to a large language model. Let me start by recalling what I know about LLMs. They're big language models, right? So I should mention their ability to understand and generate text. Maybe start with the basics: they can process and generate text, not just a few words. Then explain their training data, like the amount of text they're trained on. Also, their capabilities: understanding and generating text, answering questions, etc. Need
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Inp 00002 ──────────────────────────────┐
 <|im_start|>user
@@ -158,20 +245,23 @@ First, the patient's name and date of admission. I should make sure to include t
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Inp 00003 ──────────────────────────────┐
 <|im_start|>user
-Comparison of Sortino Ratio for Bitcoin and Ethereum.<|im_end|>                                                                                                                                                     <|im_start|>assistant                                                                                                                                                                                               └───────────────────────────────────────────────────────────────────────┘
+Comparison of Sortino Ratio for Bitcoin and Ethereum.<|im_end|>
+<|im_start|>assistant
+└───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00003 ──────────────────────────────┐
 <think>
 Okay, the user is asking for a comparison between the Sortino Ratio for Bitcoin and Ethereum. Let me start by recalling what the Sortino Ratio is. It's a measure of risk-adjusted return for a portfolio, right? It's calculated as (Return - Risk-Free Rate) divided by the Risk (Standard Deviation). The Sortino Ratio is usually used for a single asset, so comparing it between Bitcoin and Ethereum would be useful.
 
 First, I need to check the historical data
 └───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐                                                                                                                                           Prompt processing:   1407.7 tokens/sec ( 72 tokens in 0.1s)
-Tokens generation:    475.1 tokens/sec (400 tokens in 0.8s)
+┌────────────────────────────── Benchmark ──────────────────────────────┐
+Prompt processing:   1405.0 tokens/sec ( 72 tokens in 0.1s)
+Tokens generation:    474.6 tokens/sec (400 tokens in 0.8s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing DoRA training...
-epoch=    0 avg_loss=    0.34 elp_train=    9.82
+epoch=    0 avg_loss=    0.32 elp_train=    9.69
 └ test output: ['<svg width="100" height="100" viewBox="-50 -5']
-epoch=    1 avg_loss=    0.05 elp_train=    9.79
+epoch=    1 avg_loss=    0.05 elp_train=    9.66
 └ test output: ['<svg width="100" height="100" viewBox="-50 -5']
 〄 Testing DoRA decoding...
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
@@ -181,37 +271,417 @@ medium red circle
 <|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="38" fill="#f6f4f5"/></svg>                                                                      └───────────────────────────────────────────────────────────────────────┘
+<svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="24" fill="#f6f4f5"/></svg>
+└───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    324.2 tokens/sec ( 12 tokens in 0.0s)                                                                                                                                                         Tokens generation:    164.4 tokens/sec (256 tokens in 1.6s)
+Prompt processing:    358.0 tokens/sec ( 12 tokens in 0.0s)
+Tokens generation:    139.3 tokens/sec (256 tokens in 1.8s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing collapse...
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
 Write a story about Einstein
-<|im_end|>                                                                                                                                                                                                          <|im_start|>assistant
+<|im_end|>
+<|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-The story of a person who is not only a scientist, but also a part of the society that is more than a mere physical space. The story of a person who is not only in the same as the same place, as a whole, and thus the same as the same place. The story of the person who is not only in the same as the time and space, as a whole, as a whole, and thus the same as the whole. The story of the person who is not
+<think>
+Okay, the user wants me to write a story about Einstein. Let me start by thinking about the main character. Einstein is a famous scientist, so I need to pick a character who's relatable. The user might be looking for a story that's both intellectual and human. Let me brainstorm some ideas. The story should be engaging, so I need to pick a specific topic. Maybe start with a relatable scenario. The user might want to explore different aspects of Einstein's life.
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    568.8 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    253.6 tokens/sec (100 tokens in 0.4s)
+Prompt processing:    481.1 tokens/sec ( 14 tokens in 0.0s)
+Tokens generation:    239.5 tokens/sec (100 tokens in 0.4s)
 └───────────────────────────────────────────────────────────────────────┘
-〄 Testing healing...                                                                                                                                                                                               epoch=    0 avg_loss=    2.07 elp_train=   11.81
-└ test output: ['the medium red color is a symbol of the first or the second level of the design of the design']
-epoch=    1 avg_loss=    2.08 elp_train=   12.21                                                                                                                                                                    └ test output: ['the medium red color is a symbol of the first or the second level of the design of the design']
+〄 Testing healing...
+epoch=    0 avg_loss=    0.83 elp_train=   19.72
+└ test output: ['<think>\nOkay, the user is asking for a medium red circle. Let me start by understanding the']
+epoch=    1 avg_loss=    0.85 elp_train=   19.52
+└ test output: ['<think>\nOkay, the user is asking for a medium red circle. Let me think about how to']
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
 Write a story about Einstein
 <|im_end|>
 <|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘                                                                                                                                           ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-Assistant's response is a response to the first question of the first part of the first part of the first part of the story about the first part of the first part of the answer of the question. the answer is a response to the question about the first part of the answer of the question, which is the first part of the answer of the question, and the answer is a part of the answer of the question, and the answer is a part of the answer of the answer of the question,
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+<think>
+Okay, the user wants a story about Einstein. Let me start by thinking about the key points Einstein had. He was a genius, so I need to highlight his contributions to science. Maybe start with his early life, his work on the EPR paradox. Then move to his later years. I should mention his famous equations and the EPR paradox. Also, his work on relativity and quantum mechanics. Maybe include some quotes from his time. Then wrap up with his legacy. Make
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    442.1 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    198.0 tokens/sec (100 tokens in 0.5s)
+Prompt processing:    393.8 tokens/sec ( 14 tokens in 0.0s)
+Tokens generation:    188.9 tokens/sec (100 tokens in 0.5s)
 └───────────────────────────────────────────────────────────────────────┘
+〄 Testing lm-eval on original model...
+Starting lm-evaluation-harness on: ['mmlu', 'gpqa', 'gsm8k', 'mgsm_direct']
+|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
+|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
+|gpqa_diamond_cot_n_shot                |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_cot_zeroshot              |      1|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_generative_n_shot         |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_n_shot                    |      2|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_diamond_zeroshot                  |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_extended_cot_n_shot               |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_cot_zeroshot             |      1|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_generative_n_shot        |      2|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_n_shot                   |      2|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_extended_zeroshot                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|                                       |       |none             |     0|acc_norm   |↑  |0.4000|±  |0.1633|
+|gpqa_main_cot_n_shot                   |      2|flexible-extract |     0|exact_match|↑  |0.3000|±  |0.1528|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_cot_zeroshot                 |      1|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_generative_n_shot            |      2|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_main_zeroshot                     |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_bn                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_de                         |      3|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_en                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es_spanish_bench           |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_fr                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ja                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ru                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_sw                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_te                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_th                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mmlu                                   |      2|none             |      |acc        |↑  |0.4211|±  |0.0202|
+| - humanities                          |      2|none             |      |acc        |↑  |0.4077|±  |0.0421|
+|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - international_law                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - philosophy                         |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - prehistory                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - professional_law                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - world_religions                    |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+| - other                               |      2|none             |      |acc        |↑  |0.4692|±  |0.0434|
+|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - global_facts                       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - human_aging                        |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - management                         |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - marketing                          |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - nutrition                          |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - virology                           |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+| - social sciences                     |      2|none             |      |acc        |↑  |0.4500|±  |0.0444|
+|  - econometrics                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - public_relations                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - security_studies                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - sociology                          |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+| - stem                                |      2|none             |      |acc        |↑  |0.3789|±  |0.0341|
+|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - anatomy                            |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - astronomy                          |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - college_biology                    |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - college_physics                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - computer_security                  |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+
+〄 Testing lm-eval on collapsed model...
+Starting lm-evaluation-harness on: ['mmlu', 'gpqa', 'gsm8k', 'mgsm_direct']
+|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
+|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
+|gpqa_diamond_cot_n_shot                |      2|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_cot_zeroshot              |      1|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_generative_n_shot         |      2|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_n_shot                    |      2|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_diamond_zeroshot                  |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|                                       |       |none             |     0|acc_norm   |↑  |0.3000|±  |0.1528|
+|gpqa_extended_cot_n_shot               |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_cot_zeroshot             |      1|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_generative_n_shot        |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_n_shot                   |      2|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_extended_zeroshot                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_main_cot_n_shot                   |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_cot_zeroshot                 |      1|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_generative_n_shot            |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_main_zeroshot                     |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|                                       |       |none             |     0|acc_norm   |↑  |0.3000|±  |0.1528|
+|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_bn                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_de                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_en                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es_spanish_bench           |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_fr                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ja                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ru                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_sw                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_te                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_th                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mmlu                                   |      2|none             |      |acc        |↑  |0.3035|±  |0.0190|
+| - humanities                          |      2|none             |      |acc        |↑  |0.2769|±  |0.0375|
+|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - international_law                  |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - philosophy                         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
+|  - prehistory                         |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - professional_law                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - world_religions                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+| - other                               |      2|none             |      |acc        |↑  |0.3308|±  |0.0413|
+|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - global_facts                       |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - human_aging                        |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - management                         |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - marketing                          |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - nutrition                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - virology                           |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+| - social sciences                     |      2|none             |      |acc        |↑  |0.2917|±  |0.0409|
+|  - econometrics                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
+|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - public_relations                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - security_studies                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - sociology                          |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+| - stem                                |      2|none             |      |acc        |↑  |0.3105|±  |0.0333|
+|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - anatomy                            |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - astronomy                          |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_biology                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - college_physics                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - computer_security                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.7000|±  |0.1528|
+|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+
+〄 Testing lm-eval on healed model...
+epoch=    0 avg_loss=    0.85 elp_train=   19.24
+└ test output: ['<think>\nOkay, the user is asking for a medium red circle. Let me start by understanding the']
+epoch=    1 avg_loss=    0.82 elp_train=   19.16
+└ test output: ['<think>\nOkay, the user is asking for a medium red circle. Let me think about how to']
+Starting lm-evaluation-harness on: ['mmlu', 'gpqa', 'gsm8k', 'mgsm_direct']
+|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
+|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
+|gpqa_diamond_cot_n_shot                |      2|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_cot_zeroshot              |      1|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_generative_n_shot         |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_diamond_n_shot                    |      2|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|                                       |       |none             |     0|acc_norm   |↑  |0.1000|±  |0.1000|
+|gpqa_diamond_zeroshot                  |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|                                       |       |none             |     0|acc_norm   |↑  |0.3000|±  |0.1528|
+|gpqa_extended_cot_n_shot               |      2|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_cot_zeroshot             |      1|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_generative_n_shot        |      2|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_extended_n_shot                   |      2|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_extended_zeroshot                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_main_cot_n_shot                   |      2|flexible-extract |     0|exact_match|↑  |0.3000|±  |0.1528|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_cot_zeroshot                 |      1|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_generative_n_shot            |      2|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.1333|
+|                                       |       |strict-match     |     0|exact_match|↑  |0.0000|±  |0.0000|
+|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.1333|
+|gpqa_main_zeroshot                     |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|                                       |       |none             |     0|acc_norm   |↑  |0.3000|±  |0.1528|
+|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_bn                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_de                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_en                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_es_spanish_bench           |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_fr                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ja                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_ru                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_sw                         |      3|flexible-extract |     0|exact_match|↑  |0.1000|±  |0.1000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_te                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_th                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
+|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
+|mmlu                                   |      2|none             |      |acc        |↑  |0.2930|±  |0.0190|
+| - humanities                          |      2|none             |      |acc        |↑  |0.2462|±  |0.0379|
+|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - international_law                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - philosophy                         |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - prehistory                         |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - professional_law                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - world_religions                    |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+| - other                               |      2|none             |      |acc        |↑  |0.3154|±  |0.0414|
+|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - global_facts                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - human_aging                        |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - management                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - marketing                          |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - nutrition                          |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - virology                           |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+| - social sciences                     |      2|none             |      |acc        |↑  |0.3500|±  |0.0439|
+|  - econometrics                       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.6000|±  |0.1633|
+|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - public_relations                   |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - security_studies                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - sociology                          |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+| - stem                                |      2|none             |      |acc        |↑  |0.2737|±  |0.0320|
+|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - anatomy                            |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - astronomy                          |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - college_biology                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.1000|±  |0.1000|
+|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - college_physics                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - computer_security                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
+|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.4000|±  |0.1633|
+|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.5000|±  |0.1667|
+|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
+|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.3000|±  |0.1528|
+|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
+|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.1333|
 ```
 </pre></details><br>

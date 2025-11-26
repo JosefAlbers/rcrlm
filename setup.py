@@ -5,6 +5,7 @@ requirements = [
     "tokenizerz==0.0.2",
     "tqdm",
     "datasets",
+    # "lm-eval==0.4.9.1",
 ]
 
 extras_require = {
@@ -17,10 +18,10 @@ setup(
     name='rcrlm',
     url='https://github.com/JosefAlbers/rcrlm',
     packages=find_packages(),
-    version='0.0.1a3',
+    version='0.0.1a6',
     readme="README.md",
     author_email="albersj66@gmail.com",
-    description="rcrlm: Collapse layers into a recurrent block",
+    description="rcr-lm: Collapse layers into a recurrent block",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     author="J Joe",

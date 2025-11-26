@@ -1,1 +1,1 @@
-from .main import load, infer, train, collapse, heal
+from .main import load, infer, train, collapse, distill

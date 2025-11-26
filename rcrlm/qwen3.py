@@ -20,7 +20,6 @@ class Attention(nn.Module):
         self.rot_dims = rot_dims = None if getattr(config, "partial_rotary_factor", 1.0)>=1.0 else int(self.head_dim * getattr(config, "partial_rotary_factor", 1.0))
         self.apply_rope = mx.compile(create_rope_applier(rot_dims, config.rope_traditional))
 
-
     def __call__(self, x, attention_mask, rope, cache):
         B, L, _ = x.shape
         q = self.q_proj(x)
