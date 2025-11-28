@@ -634,9 +634,12 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             for row in batch_rows:
                 # str_i = f"<|im_start|>user\n{row['str_i'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
                 str_i = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
-                str_o = f"{row['str_o'].strip()}\n<|im_end|>"
                 iid_i = tokenizer.encode(str_i)
-                iid_o = tokenizer.encode(str_o) + [eos_id]
+                str_a = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}, {"role": "assistant", "content": row['str_o'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':False, 'enable_thinking':False})
+                iid_a = tokenizer.encode(str_a)
+                iid_o = iid_a[len(iid_i):]
+                # str_o = f"{row['str_o'].strip()}\n<|im_end|>"
+                # iid_o = tokenizer.encode(str_o) #+ [eos_id]
                 input_ids = iid_i + iid_o
                 input_ids = input_ids[:sl]
                 label_mask = [0]*len(iid_i) + [1]*len(iid_o)

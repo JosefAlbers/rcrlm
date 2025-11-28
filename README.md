@@ -48,7 +48,7 @@ Tokens generation:    217.3 tokens/sec (100 tokens in 0.5s)
 
 ### Accelerated Inference
 
-`rcr-lm` achieves generation speeds exceeding 200 tokens/sec, offering a measurable performance uplift over standard MLX implementations.
+`rcr-lm` achieves generation speeds exceeding 200 tokens/sec, offering a measurable performance uplift over standard LLM implementations.
 
 ```python
 from rcrlm import load, infer
@@ -106,6 +106,65 @@ Prompt: 13 tokens, 34.744 tokens-per-sec
 Generation: 256 tokens, 174.251 tokens-per-sec
 Peak memory: 1.415 GB
 ```
+
+#### transformers (for comparison)
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import time
+
+model_name = "Qwen/Qwen3-0.6B"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    torch_dtype="auto",
+    device_map="auto"
+)
+
+prompt = "Write a story about Einstein"
+messages = [
+    {"role": "user", "content": prompt}
+]
+text = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True,
+    enable_thinking=True
+)
+model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+
+tic_gen = time.perf_counter()
+generated_ids = model.generate(
+    **model_inputs,
+    max_new_tokens=256
+)
+elp_gen = time.perf_counter() - tic_gen
+
+output_ids = generated_ids[0][len(model_inputs.input_ids[0]):].tolist() 
+
+content = tokenizer.decode(output_ids, skip_special_tokens=False).strip("\n")
+print(content)
+print('==========')
+print(f'{model_inputs['input_ids'].shape[1]} prompt tokens and {len(output_ids)} generated tokens in {elp_gen:.2f} seconds')
+
+```
+
+```
+<think>
+Okay, the user wants me to write a story about Einstein. Let me start by thinking about the key elements that make Einstein a famous figure. He's a genius, a scientist, and a man of philosophy. I need to make sure the story captures these aspects.
+
+First, I should set the scene. Maybe start with his early life to show his early brilliance. His childhood, maybe a small village, and his parents. Then introduce his academic journey, the famous equations, and his work on the theory of relativity. Including his personal life, like his family and his later life, would add depth.
+
+I need to include some conflict or challenge to make the story engaging. Perhaps a time when he faced opposition or personal struggles. Maybe his work on the theory of relativity was controversial, which adds tension. Also, highlighting his personality traits—like his curiosity, determination, and the impact he had on society.
+
+I should make sure the story has a clear beginning, middle, and end. Start with his early achievements, then his scientific contributions, and end with his legacy. Avoid clichés, but still capture his essence. Maybe include some quotes or references to his work to add authenticity.
+
+Wait, the user might be looking for a story that's both
+==========
+13 prompt tokens and 256 generated tokens in 10.66 seconds
+```
+
+*Note: Included for baseline reference. transformers is not fully optimized for inference on Apple Silicon (MPS) compared to its performance on NVIDIA GPUs.*
 
 ### Batched Decoding
 
@@ -225,10 +284,8 @@ Native integration with `lm-evaluation-harness`. Benchmark vanilla and customize
 from rcrlm.evals import eval_lm
 m = load()
 e_orgn = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-print('〄 Testing lm-eval on collapsed model...')
 m['model'] = collapse(m['model'])
 e_coll = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-print('〄 Testing lm-eval on healed model...')
 teacher = load()['model']
 m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
 e_heal = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
