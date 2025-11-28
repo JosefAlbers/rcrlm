@@ -164,7 +164,7 @@ def measure_performance(start_time, prompt_time, end_time, batch_size, seq_lengt
         print(f'└{PRETTY_HW*2}───────────┘')
     return metrics
 # }}} === PREP ===
-# {{{ === ROPE/CACHE ===
+# {{{ === I_UTILS ===
 @mx.compile
 def update_cache(max_len, cache_k, cache_v, new_k, new_v):
     seq_len = new_k.shape[2]
@@ -300,7 +300,7 @@ def create_rope_applier(rot_dims=None, traditional=False):
         k_odd  = k_rot[..., 1::2]
         q_rotated = mx.stack([(q_even * cos - q_odd * sin), (q_even * sin + q_odd * cos)], axis=-1).reshape(q_rot.shape)
         k_rotated = mx.stack([(k_even * cos - k_odd * sin), (k_even * sin + k_odd * cos)], axis=-1).reshape(k_rot.shape)
-        return q_rotated.astype(q.dtype), k_rotated.astype(k.dtype)
+        return q_rotated, k_rotated
     def _apply_rope_dim_True(q, k, cos, sin, rot_dims):
         q_rot, q_pass = q[..., :rot_dims], q[..., rot_dims:]
         k_rot, k_pass = k[..., :rot_dims], k[..., rot_dims:]
@@ -341,7 +341,7 @@ def create_rope_applier(rot_dims=None, traditional=False):
             k_split[..., 0, :] * cos - k_split[..., 1, :] * sin,
             k_split[..., 1, :] * cos + k_split[..., 0, :] * sin,
         ], axis=-1)
-        return q_rotated.astype(q.dtype), k_rotated.astype(k.dtype)
+        return q_rotated, k_rotated
     if traditional:
         if rot_dims is None:
             return _apply_rope_None_True
@@ -360,7 +360,7 @@ def create_causal_mask(padding_mask):
     causal_mask = causal_matrix & padding_mask[:, None, :]
     # causal_mask = mx.where(causal_matrix & padding_mask[:, None, :], 0.0, -1e9) # additive
     return causal_mask[:, None, :, :]
-# }}} === ROPE/CACHE ===
+# }}} === I_UTILS ===
 # {{{ === INFER ===
 def infer(
     prompts,
@@ -420,16 +420,21 @@ def infer(
     cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)] # for RollCacher
     zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
     goon = mx.ones((B, 1), dtype=mx.bool_)
+
+    eos_ids = [config.eos_token_id] if isinstance(config.eos_token_id, int) else config.eos_token_id # ad hoc
+    eos_ids = mx.array(eos_ids)
     eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
     carry = (input_ids, position_ids, causal_mask, mx.ones((B, 1), dtype=mx.bool_))
-    mx.eval(model, roper, cache, carry, zeropad)
+    mx.eval(model, roper, cache, carry, zeropad, eos_ids)
     def scan_step(prev_carry):
         prev_input_ids, prev_position_ids, prev_mask, prev_goon = prev_carry
         rope = roper(prev_position_ids)
         logits = model(prev_input_ids, prev_mask, rope, cache)
         next_input_ids = mx.where(prev_goon, mx.argmax(logits[:, -1, :], axis=-1, keepdims=True), eos_id)
         new_mask = mx.concat([prev_mask[:, :, -1:, 1:], zeropad], axis=-1) # for RollCacher
-        new_goon = prev_goon & (next_input_ids != eos_id)
+        # new_goon = prev_goon & (next_input_ids != eos_id)
+        is_eos = mx.any(next_input_ids == eos_ids, axis=-1, keepdims=True)
+        new_goon = prev_goon & (~is_eos)
         next_position_ids = prev_position_ids[:, -1:] + 1
         new_carry = (next_input_ids, next_position_ids, new_mask, new_goon)
         return new_carry, next_input_ids
@@ -469,15 +474,16 @@ def infer(
     mx.clear_cache()
     output_str = []
     for i, (i_str, o_ids) in enumerate(zip(input_str, output_ids)):
-        o_ids = o_ids[:o_ids.index(eos_id)] if eos_id in o_ids else o_ids
+        o_ids = o_ids[:o_ids.index(eos_id)+1] if eos_id in o_ids else o_ids
         o_str = tokenizer.decode(o_ids)
         output_str.append(o_str)
         if verbose:
             print(f'┌{PRETTY_HW} Inp {i:05} {PRETTY_HW}┐\n{i_str.strip()}\n└{PRETTY_HW*2}───────────┘\n┌{PRETTY_HW} Out {i:05} {PRETTY_HW}┐\n{o_str.strip()}\n└{PRETTY_HW*2}───────────┘')
-    _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
-    return dict(inp_str=input_str, inp_ids=input_ids,out_str=output_str, out_ids=output_ids)
+    if verbose:
+        _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
+    return dict(inp_str=input_str, inp_ids=input_ids, out_str=output_str, out_ids=output_ids)
 # }}} === INFER ===
-# {{{ === DORA ===
+# {{{ === T_UTILS ===
 class DoRALinear(nn.Module):
     @staticmethod
     def from_linear(linear, r, alpha, scale, dropout):
@@ -529,7 +535,7 @@ def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scal
     for l in lora_layers:
         loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
         l.update_modules(tree_unflatten(loralized))
-# }}} === DORA ===
+# }}} === T_UTILS ===
 # {{{ === TRAIN ===
 def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, lora_cfg=None):
     LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
@@ -557,23 +563,51 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
     mx.clear_cache()
     return model
 
-def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, teacher=None, temperature=1.0):
-    cache = [lambda x,y: (x,y)]*config.num_hidden_layers
+def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, 
+           teacher=None, temperature=1.0, teacher_to_student=None, 
+           hidden_loss_weight=0.2):
+    cache = [lambda x,y: (x,y)] * config.num_hidden_layers
+    t_hiddens = [i[0] for i in teacher_to_student] if teacher_to_student else []
+    s_hiddens = [i[1] for i in teacher_to_student] if teacher_to_student else []
+    l_hiddens = len(t_hiddens)
+
     if teacher is not None:
         teacher.freeze()
+
     def loss_fn(model, X, causal_mask, rope, y, label_mask):
-        logits = model(X, causal_mask, rope, cache)
+        logits, student_captures = model(X, causal_mask, rope, cache, hiddens=s_hiddens)
+
         if teacher is not None:
-            teacher_logits = mx.stop_gradient(teacher(X, causal_mask, rope, cache))
+            teacher_logits, teacher_captures = teacher(X, causal_mask, rope, cache, hiddens=t_hiddens)
             log_p_student = nn.log_softmax(logits / temperature, axis=-1)
-            log_p_teacher = nn.log_softmax(teacher_logits / temperature, axis=-1)
+            log_p_teacher = mx.stop_gradient(nn.log_softmax(teacher_logits / temperature, axis=-1))
             p_student = mx.exp(log_p_student) 
             kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
-            loss_masked = kld_loss * label_mask
-            return (loss_masked.sum() / label_mask.sum()) * (temperature ** 2)
+            logit_loss_masked = (kld_loss * label_mask).sum() / label_mask.sum()
+            logit_loss_scaled = logit_loss_masked * (temperature ** 2)
+            hidden_loss_accum = 0.0
+            for s_cap, t_cap in zip(student_captures, teacher_captures):
+                t_cap_detached = mx.stop_gradient(t_cap)
+                # # {{ --- mse ---
+                # mse = (s_cap - t_cap_detached)**2
+                # masked_loss = mse * label_mask[..., None] 
+                # # }} --- mse ---
+                # {{ --- cos ---
+                s_norm = s_cap / (mx.linalg.norm(s_cap, axis=-1, keepdims=True) + 1e-6)
+                t_norm = t_cap_detached / (mx.linalg.norm(t_cap_detached, axis=-1, keepdims=True) + 1e-6)
+                layer_loss_raw = 1.0 - mx.sum(s_norm * t_norm, axis=-1)
+                masked_loss = layer_loss_raw * label_mask # (Batch, Seq)
+                # }} --- cos ---
+                layer_loss = masked_loss.sum() / label_mask.sum()
+                hidden_loss_accum += layer_loss
+            hidden_loss_accum /= l_hiddens
+            total_loss = (1.0-hidden_loss_weight)*logit_loss_scaled + hidden_loss_weight * hidden_loss_accum
+            return total_loss
+            
         else:
             ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
             return ce.astype(mx.float32).sum() / label_mask.sum()
+
     mx.eval(model)
     n_steps = n_epochs * len(ds) // bs
     import mlx.optimizers as optim
@@ -582,7 +616,8 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, tea
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     roper = Roper(config)
     mx.eval(roper, model, optimizer, teacher)
-    test_prompt = f"<|im_start|>user\nmedium red circle\n<|im_end|>\n<|im_start|>assistant\n"
+    # test_prompt = f"<|im_start|>user\nmedium red circle\n<|im_end|>\n<|im_start|>assistant\n"
+    test_prompt = tokenizer.apply_chat_template([{"role": "user", "content": "medium red circle"}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
     eos_id = config.eos_token_id
     import random
     for epoch in range(n_epochs):
@@ -597,7 +632,8 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, tea
             _lms = []
             _ams = []
             for row in batch_rows:
-                str_i = f"<|im_start|>user\n{row['str_i'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
+                # str_i = f"<|im_start|>user\n{row['str_i'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
+                str_i = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
                 str_o = f"{row['str_o'].strip()}\n<|im_end|>"
                 iid_i = tokenizer.encode(str_i)
                 iid_o = tokenizer.encode(str_o) + [eos_id]
@@ -666,7 +702,7 @@ def svdlora(model, tokenizer, config, collapse_cfg=None):
     print(f'{d1=}')
     print(f'{d2=}')
     W_cat = mx.concatenate(Ws, axis=1)
-    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx svd as of v0.30.0 doesn't support gpu nor thinning; also crashes too..
+    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx svd as of v0.30.0 doesn't support gpu nor thinning; crashes too..
     # mx.eval(U, S, Vt)
     U, S, Vt = np.linalg.svd(W_cat.astype(mx.float32), full_matrices=False) # can thin svd but slow af
     Ws = [np.array(_w.astype(mx.float32)) for _w in Ws]
@@ -709,33 +745,44 @@ class RecurrentBlock(nn.Module):
             x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache)
         return x
 
-def collapse(model):
-    target_indices = [13, 14, 15]
-    primary_idx = 13
+def collapse(model, collapse_ranges=None):
+    if collapse_ranges is None:
+        collapse_ranges = [(13,17)]
     layers = model.model.layers
-    W_avg = {}
-    ref_layer = model.model.layers[primary_idx]
-    dim = ref_layer.input_layernorm.weight.shape[0]
-    rec_block = RecurrentBlock(ref_layer, n_rcr=len(target_indices), dim=dim)
     new_layers = []
+    teacher_to_student = [] 
+    start_to_range = {start: (start, end) for start, end in collapse_ranges}
+    indices_to_skip = set()
+    for start, end in collapse_ranges:
+        for i in range(start + 1, end):
+            indices_to_skip.add(i)
     for i, layer in enumerate(layers):
-        if i == primary_idx:
+        student_idx = len(new_layers)
+        if i in start_to_range:
+            start, end = start_to_range[i]
+            n_rcr = end - start
+            teacher_to_student.append((end - 1, student_idx))
+            ref_layer = layer
+            dim = ref_layer.input_layernorm.weight.shape[0]
+            rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr, dim=dim)
             new_layers.append(rec_block)
-        elif i in target_indices:
+        elif i in indices_to_skip:
             continue
         else:
             new_layers.append(layer)
     model.model.layers = new_layers
+    model.teacher_to_student = teacher_to_student
     return model
 
 def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=2, lr=1e-6, bs=2, sl=1024, to='distilled.safetensors'):
+    teacher_to_student = getattr(model, "teacher_to_student", None)
+    print(f'{teacher_to_student=}')
     from mlx.utils import tree_unflatten
     model.freeze()
     def to_lora(layer):
-        return DoRALinear.from_linear(layer, r=32, alpha=32, scale=0.01, dropout=0.0)
+        return DoRALinear.from_linear(layer, r=128, alpha=128, scale=0.01, dropout=0.0)
     for l in model.model.layers:
         if getattr(l, 'n_rcr', None):
-            # print([k for k, m in l.named_modules() if k.endswith('proj')])
             loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
             l.update_modules(tree_unflatten(loralized))
             l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
@@ -743,7 +790,7 @@ def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=2, lr=1e-6, 
     ds = load_dataset(ds_id, split="test").to_list()
     ds = ds[:100]
     ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
-    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl)
+    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
     from mlx.utils import tree_flatten
     mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
     mx.clear_cache()

@@ -28,7 +28,6 @@ class Attention(nn.Module):
         q = self.q_norm(q.reshape(B, L, self.n_q_heads, self.head_dim)).transpose(0, 2, 1, 3)
         k = self.k_norm(k.reshape(B, L, self.n_kv_heads, self.head_dim)).transpose(0, 2, 1, 3)
         v = v.reshape(B, L, self.n_kv_heads, self.head_dim).transpose(0, 2, 1, 3)
-        # q, k = apply_rope(q, k, rope[0], rope[1], rot_dims=self.rot_dims)
         q, k = self.apply_rope(q, k, rope[0], rope[1], rot_dims=self.rot_dims)
         k, v = cache(k, v)
         o = mx.fast.scaled_dot_product_attention(q,k,v,scale=self.scale,mask=attention_mask)
@@ -67,11 +66,14 @@ class Qwen3Model(nn.Module):
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
         self.norm = nn.RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def __call__(self, input_ids, attention_mask, rope, cache):
+    def __call__(self, input_ids, attention_mask, rope, cache, hiddens=None):
+        captures = []
         x = self.embed_tokens(input_ids)
-        for c, layer in zip(cache, self.layers):
+        for _idx, (c, layer) in enumerate(zip(cache, self.layers)):
             x = layer(x, attention_mask=attention_mask, rope=rope, cache=c)
-        return self.norm(x)
+            if hiddens is not None and _idx in hiddens:
+                captures.append(x)
+        return self.norm(x), captures
 
 class Qwen3ForCausalLM(nn.Module):
     def __init__(self, config):
@@ -81,11 +83,13 @@ class Qwen3ForCausalLM(nn.Module):
         if not tie:
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
-    def __call__(self, input_ids, attention_mask, rope, cache):
-        x = self.model(input_ids, attention_mask=attention_mask, rope=rope, cache=cache)
+    def __call__(self, input_ids, attention_mask, rope, cache, hiddens=None):
+        x, captures = self.model(input_ids, attention_mask=attention_mask, rope=rope, cache=cache, hiddens=hiddens)
         if self.tie:
             x = self.model.embed_tokens.as_linear(x)
         else:
             x = self.lm_head(x)
-        return x
+        if hiddens is None:
+            return x
+        return x, captures
 

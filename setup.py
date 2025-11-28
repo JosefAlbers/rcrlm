@@ -2,10 +2,10 @@ from setuptools import find_packages, setup
 
 requirements = [
     "mlx==0.30.0; platform_system == 'Darwin'",
-    "tokenizerz==0.0.2",
+    "tokenizerz==0.0.3a4",
     "tqdm",
     "datasets",
-    # "lm-eval==0.4.9.1",
+    # "lm-eval==0.4.9.1", "matplotlib"
 ]
 
 extras_require = {
@@ -18,7 +18,7 @@ setup(
     name='rcrlm',
     url='https://github.com/JosefAlbers/rcrlm',
     packages=find_packages(),
-    version='0.0.1',
+    version='0.0.2a1',
     readme="README.md",
     author_email="albersj66@gmail.com",
     description="rcr-lm: Collapse layers into a recurrent block",
