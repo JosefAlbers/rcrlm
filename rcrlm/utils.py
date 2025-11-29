@@ -420,7 +420,6 @@ def infer(
     cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)] # for RollCacher
     zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
     goon = mx.ones((B, 1), dtype=mx.bool_)
-
     eos_ids = [config.eos_token_id] if isinstance(config.eos_token_id, int) else config.eos_token_id # ad hoc
     eos_ids = mx.array(eos_ids)
     eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
@@ -565,7 +564,7 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
 
 def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, 
            teacher=None, temperature=1.0, teacher_to_student=None, 
-           hidden_loss_weight=0.2):
+           hidden_loss_weight=1.0):
     cache = [lambda x,y: (x,y)] * config.num_hidden_layers
     t_hiddens = [i[0] for i in teacher_to_student] if teacher_to_student else []
     s_hiddens = [i[1] for i in teacher_to_student] if teacher_to_student else []
@@ -581,27 +580,43 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             teacher_logits, teacher_captures = teacher(X, causal_mask, rope, cache, hiddens=t_hiddens)
             log_p_student = nn.log_softmax(logits / temperature, axis=-1)
             log_p_teacher = mx.stop_gradient(nn.log_softmax(teacher_logits / temperature, axis=-1))
-            p_student = mx.exp(log_p_student) 
-            kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
-            logit_loss_masked = (kld_loss * label_mask).sum() / label_mask.sum()
+            # {{ --- forward kld
+            p_teacher = mx.stop_gradient(mx.exp(log_p_teacher))
+            kld_loss = mx.sum(p_teacher * (log_p_teacher - log_p_student), axis=-1)
+            # }} --- forward kld
+            # # {{ --- reverse kld
+            # p_student = mx.exp(log_p_student)
+            # kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
+            # # }} --- reverse kld
+            logit_loss_masked = (kld_loss * label_mask).astype(mx.float32).sum() / label_mask.sum()
             logit_loss_scaled = logit_loss_masked * (temperature ** 2)
+
             hidden_loss_accum = 0.0
             for s_cap, t_cap in zip(student_captures, teacher_captures):
                 t_cap_detached = mx.stop_gradient(t_cap)
-                # # {{ --- mse ---
-                # mse = (s_cap - t_cap_detached)**2
-                # masked_loss = mse * label_mask[..., None] 
-                # # }} --- mse ---
-                # {{ --- cos ---
-                s_norm = s_cap / (mx.linalg.norm(s_cap, axis=-1, keepdims=True) + 1e-6)
-                t_norm = t_cap_detached / (mx.linalg.norm(t_cap_detached, axis=-1, keepdims=True) + 1e-6)
-                layer_loss_raw = 1.0 - mx.sum(s_norm * t_norm, axis=-1)
-                masked_loss = layer_loss_raw * label_mask # (Batch, Seq)
-                # }} --- cos ---
-                layer_loss = masked_loss.sum() / label_mask.sum()
+                
+                # {{ --- mse ---
+                mse_raw = (s_cap - t_cap_detached) ** 2
+                mse_per_token = mx.mean(mse_raw, axis=-1) # Mean over hidden dim
+                masked_loss = mse_per_token * label_mask
+                # }} --- mse ---
+                
+                # # {{ --- cos ---
+                # layer_loss_raw = -1.0-nn.losses.cosine_similarity_loss(s_cap, t_cap_detached, axis=-1, reduction='none') # {{
+                # # s_norm = s_cap / (mx.linalg.norm(s_cap, axis=-1, keepdims=True) + 1e-6)
+                # # t_norm = t_cap_detached / (mx.linalg.norm(t_cap_detached, axis=-1, keepdims=True) + 1e-6)
+                # # layer_loss_raw = 1.0 - mx.sum(s_norm * t_norm, axis=-1)
+                # # # }}
+                # masked_loss = layer_loss_raw * label_mask 
+                # # }} --- cos ---
+
+                layer_loss = masked_loss.astype(mx.float32).sum() / label_mask.sum()
                 hidden_loss_accum += layer_loss
-            hidden_loss_accum /= l_hiddens
-            total_loss = (1.0-hidden_loss_weight)*logit_loss_scaled + hidden_loss_weight * hidden_loss_accum
+
+            # hidden_loss_accum /= l_hiddens
+            
+            total_loss = logit_loss_scaled + hidden_loss_weight * hidden_loss_accum
+            # total_loss = hidden_loss_accum # sanity check on cos_sim_loss
             return total_loss
             
         else:
@@ -616,7 +631,6 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     roper = Roper(config)
     mx.eval(roper, model, optimizer, teacher)
-    # test_prompt = f"<|im_start|>user\nmedium red circle\n<|im_end|>\n<|im_start|>assistant\n"
     test_prompt = tokenizer.apply_chat_template([{"role": "user", "content": "medium red circle"}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
     eos_id = config.eos_token_id
     import random
@@ -632,17 +646,19 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             _lms = []
             _ams = []
             for row in batch_rows:
-                # str_i = f"<|im_start|>user\n{row['str_i'].strip()}\n<|im_end|>\n<|im_start|>assistant\n"
-                str_i = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
-                iid_i = tokenizer.encode(str_i)
                 str_a = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}, {"role": "assistant", "content": row['str_o'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':False, 'enable_thinking':False})
+                str_a = str_a.strip()
                 iid_a = tokenizer.encode(str_a)
-                iid_o = iid_a[len(iid_i):]
-                # str_o = f"{row['str_o'].strip()}\n<|im_end|>"
-                # iid_o = tokenizer.encode(str_o) #+ [eos_id]
-                input_ids = iid_i + iid_o
+                if teacher is None:
+                    str_i = tokenizer.apply_chat_template([{"role": "user", "content": row['str_i'].strip()}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
+                    iid_i = tokenizer.encode(str_i)
+                    iid_o = iid_a[len(iid_i):]
+                    input_ids = iid_i + iid_o
+                    label_mask = [0]*len(iid_i) + [1]*len(iid_o)
+                else:
+                    input_ids = iid_a
+                    label_mask = [1]*len(iid_a)
                 input_ids = input_ids[:sl]
-                label_mask = [0]*len(iid_i) + [1]*len(iid_o)
                 label_mask = label_mask[:sl]
                 _Xs.append(input_ids[:-1])
                 _ys.append(input_ids[1:])
@@ -777,13 +793,13 @@ def collapse(model, collapse_ranges=None):
     model.teacher_to_student = teacher_to_student
     return model
 
-def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=2, lr=1e-6, bs=2, sl=1024, to='distilled.safetensors'):
+def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors'):
     teacher_to_student = getattr(model, "teacher_to_student", None)
     print(f'{teacher_to_student=}')
     from mlx.utils import tree_unflatten
     model.freeze()
     def to_lora(layer):
-        return DoRALinear.from_linear(layer, r=128, alpha=128, scale=0.01, dropout=0.0)
+        return DoRALinear.from_linear(layer, r=128, alpha=128, scale=0.1, dropout=0.0)
     for l in model.model.layers:
         if getattr(l, 'n_rcr', None):
             loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
@@ -791,7 +807,7 @@ def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=2, lr=1e-6, 
             l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
     from datasets import load_dataset
     ds = load_dataset(ds_id, split="test").to_list()
-    ds = ds[:100]
+    ds = ds[:200]
     ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
     model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
     from mlx.utils import tree_flatten

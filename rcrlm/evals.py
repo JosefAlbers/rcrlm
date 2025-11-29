@@ -1,9 +1,3 @@
-# import datasets
-# datasets.disable_progress_bar()
-# datasets.logging.set_verbosity_error()
-# import os
-# os.environ["HF_DATASETS_DISABLE_PROGRESS_BAR"] = "1"
-
 from .utils import Roper, create_causal_mask, infer
 from datetime import datetime
 from tqdm import tqdm
@@ -188,7 +182,7 @@ def eval_lm(model, tokenizer, config,
         # "mbpp", 
         # "humaneval", 
     ],
-    limit=3,
+    limit=20,
     max_new_tokens=512,
     chat_template_kwargs=None,
     allow_code_eval=False,

@@ -30,22 +30,26 @@ def test(task='all'):
         print('〄 Testing healing...')
         teacher = load()['model']
         m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
-        _ = infer("Write a story about Einstein\n", **m, stream=False)
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
         del teacher, m
     if task == 'eval' or task == 'all':
         heal_test_path = 'test_heal.safetensors'
-        print('〄 Testing lm-eval on original model...')
+        eval_str = ''
         from .evals import eval_lm
         m = load()
-        e_orgn = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        print('〄 Testing lm-eval on collapsed model...')
+        print('〄 Testing lm-eval on original model...')
+        # e_orgn = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
+        eval_str += f'\nOriginal:\n{e_orgn}'
         m['model'] = collapse(m['model'])
-        e_coll = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        print('〄 Testing lm-eval on healed model...')
+        print('〄 Testing lm-eval on collapsed model...')
+        # e_coll = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
+        eval_str += f'\nCollapsed:\n{e_coll}'
         teacher = load()['model']
         m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
+        print('〄 Testing lm-eval on healed model...')
         e_heal = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        print(f'Original:\n{e_orgn}\nCollapsed:\n{e_coll}\nHealed:\n{e_heal}')
+        eval_str += f'\nHealed:\n{e_heal}'
+        print(eval_str)
         del teacher, m
 
 def load(model_id='Qwen/Qwen3-0.6B'):
