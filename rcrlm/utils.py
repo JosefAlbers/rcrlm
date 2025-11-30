@@ -417,7 +417,16 @@ def infer(
     roper = Roper(config, total_len)
     causal_mask = create_causal_mask(padding_mask) # for boolean masking
     causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=False) # for RollCacher
-    cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)] # for RollCacher
+    # {{
+    model_tts = getattr(model, "teacher_to_student", None)
+    if model_tts:
+        rcr_layers = {s:(t-s+1) for t, s in model_tts}
+        cache = [[RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(rcr_layers[i])] if i in rcr_layers else RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for i in range(len(model.model.layers))]
+        # print(f'{rcr_layers=}')
+        # print(f'{cache=}')
+    else:
+        cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)]
+    # }}
     zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
     goon = mx.ones((B, 1), dtype=mx.bool_)
     eos_ids = [config.eos_token_id] if isinstance(config.eos_token_id, int) else config.eos_token_id # ad hoc
@@ -562,6 +571,18 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
     mx.clear_cache()
     return model
 
+class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115 kinda but not rly
+    def __init__(self, student):
+        super().__init__()
+        self.student = student
+        self.log_var_logits = mx.array(0.0)
+        self.log_var_hidden = mx.array(0.0)
+        if hasattr(student, "teacher_to_student"):
+            self.teacher_to_student = student.teacher_to_student
+
+    def __call__(self, *args, **kwargs):
+        return self.student(*args, **kwargs)
+
 def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, 
            teacher=None, temperature=1.0, teacher_to_student=None, 
            hidden_loss_weight=1.0):
@@ -572,6 +593,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
 
     if teacher is not None:
         teacher.freeze()
+        model = AutoBalancingStudent(model)
 
     def loss_fn(model, X, causal_mask, rope, y, label_mask):
         logits, student_captures = model(X, causal_mask, rope, cache, hiddens=s_hiddens)
@@ -589,18 +611,22 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             # kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
             # # }} --- reverse kld
             logit_loss_masked = (kld_loss * label_mask).astype(mx.float32).sum() / label_mask.sum()
-            logit_loss_scaled = logit_loss_masked * (temperature ** 2)
+            logit_loss_raw = logit_loss_masked * (temperature ** 2)
 
             hidden_loss_accum = 0.0
             for s_cap, t_cap in zip(student_captures, teacher_captures):
                 t_cap_detached = mx.stop_gradient(t_cap)
                 
+                # # {{ --- mae ---
+                # l1_raw = mx.abs(s_cap - t_cap_detached)
+                # l1_per_token = mx.mean(l1_raw, axis=-1) # Mean over hidden dim
+                # masked_loss = l1_per_token * label_mask
+                # # }} --- mae ---
                 # {{ --- mse ---
                 mse_raw = (s_cap - t_cap_detached) ** 2
                 mse_per_token = mx.mean(mse_raw, axis=-1) # Mean over hidden dim
                 masked_loss = mse_per_token * label_mask
                 # }} --- mse ---
-                
                 # # {{ --- cos ---
                 # layer_loss_raw = -1.0-nn.losses.cosine_similarity_loss(s_cap, t_cap_detached, axis=-1, reduction='none') # {{
                 # # s_norm = s_cap / (mx.linalg.norm(s_cap, axis=-1, keepdims=True) + 1e-6)
@@ -613,11 +639,15 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
                 layer_loss = masked_loss.astype(mx.float32).sum() / label_mask.sum()
                 hidden_loss_accum += layer_loss
 
-            # hidden_loss_accum /= l_hiddens
+            hidden_loss_raw = hidden_loss_accum / l_hiddens
             
-            total_loss = logit_loss_scaled + hidden_loss_weight * hidden_loss_accum
-            # total_loss = hidden_loss_accum # sanity check on cos_sim_loss
-            return total_loss
+            prec_logits = mx.exp(-model.log_var_logits)
+            prec_hidden = mx.exp(-model.log_var_hidden)
+            
+            loss_logits = prec_logits * logit_loss_raw + 0.5 * model.log_var_logits
+            loss_hidden = prec_hidden * hidden_loss_raw + 0.5 * model.log_var_hidden
+            
+            return loss_logits + loss_hidden
             
         else:
             ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
@@ -694,9 +724,11 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
         print(f'{epoch=:5d} {avg_loss=:8.2f} {elp_train=:8.2f}')
         model.eval()
         mx.eval(model)
-        _dict_eval = infer(test_prompt, model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False, use_chat_template=False)
+        _dict_eval = infer(test_prompt, model.student if teacher is not None else model, tokenizer, config, max_new_tokens=20, stream=False, verbose=False, use_chat_template=False)
         print('└ test output:', _dict_eval['out_str'])
         
+    if teacher is not None:
+        return model.student
     return model
 
 # }}} === TRAIN ===
@@ -759,9 +791,11 @@ class RecurrentBlock(nn.Module):
     def __call__(self, x, attention_mask=None, rope=None, cache=None):
         B, L, D = x.shape
         for i in range(self.n_rcr):
-            if getattr(cache, "rollback", None):
-                cache.rollback(L*(i>0))
-            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache)
+            # if getattr(cache, "rollback", None):
+            #     cache.rollback(L*(i>0))
+            # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
+            c = cache[i] if isinstance(cache, list) else cache
+            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=c)
         return x
 
 def collapse(model, collapse_ranges=None):
@@ -814,4 +848,3 @@ def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, 
     mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
     mx.clear_cache()
     return model
-

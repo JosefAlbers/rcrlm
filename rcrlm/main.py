@@ -38,17 +38,14 @@ def test(task='all'):
         from .evals import eval_lm
         m = load()
         print('〄 Testing lm-eval on original model...')
-        # e_orgn = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        eval_str += f'\nOriginal:\n{e_orgn}'
+        eval_str += f'\nOriginal:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
         m['model'] = collapse(m['model'])
         print('〄 Testing lm-eval on collapsed model...')
-        # e_coll = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        eval_str += f'\nCollapsed:\n{e_coll}'
+        eval_str += f'\nCollapsed:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
         teacher = load()['model']
         m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
         print('〄 Testing lm-eval on healed model...')
-        e_heal = eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))
-        eval_str += f'\nHealed:\n{e_heal}'
+        eval_str += f'\nHealed:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
         print(eval_str)
         del teacher, m
 
