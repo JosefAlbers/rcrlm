@@ -80,7 +80,7 @@ class Config:
     num_hidden_layers: int
     intermediate_size: int
     num_attention_heads: int
-    eos_token_id: str
+    eos_token_id: int
     rms_norm_eps: float = 1e-6
     vocab_size: int = 0
     num_key_value_heads: int = None
@@ -92,6 +92,7 @@ class Config:
     mlp_bias: bool = False
     rope_traditional: bool = False
     partial_rotary_factor: float = 1.0
+    bos_token_id: Optional[int] = None
     max_position_embeddings: Optional[int] = None
     original_max_position_embeddings: Optional[int] = None
     logits_scaling: float = 1.0
@@ -228,7 +229,8 @@ class Roper(nn.Module):
         # cos = mx.cos(angles) * self.su_scale
         # sin = mx.sin(angles) * self.su_scale
         cos, sin = get_rope(positions, self.freq, self.su_scale)
-        return cos.astype(self.dtype), sin.astype(self.dtype)
+        # return cos.astype(self.dtype), sin.astype(self.dtype)
+        return mx.stop_gradient(cos.astype(self.dtype)), mx.stop_gradient(sin.astype(self.dtype))
 
     def _llama3(self, config):
         rot_dims = int(config.head_dim * config.partial_rotary_factor)
@@ -415,8 +417,8 @@ def infer(
     position_ids = mx.array(position_ids)
     total_len = max_new_tokens + L
     roper = Roper(config, total_len)
-    causal_mask = create_causal_mask(padding_mask) # for boolean masking
-    causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=False) # for RollCacher
+    causal_mask = create_causal_mask(padding_mask)
+    causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=False)
     # {{
     model_tts = getattr(model, "teacher_to_student", None)
     if model_tts:
@@ -429,17 +431,17 @@ def infer(
     # }}
     zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
     goon = mx.ones((B, 1), dtype=mx.bool_)
+    # eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
     eos_ids = [config.eos_token_id] if isinstance(config.eos_token_id, int) else config.eos_token_id # ad hoc
     eos_ids = mx.array(eos_ids)
-    eos_id = config.eos_token_id if isinstance(config.eos_token_id, int) else config.eos_token_id[0] # ad hoc
     carry = (input_ids, position_ids, causal_mask, mx.ones((B, 1), dtype=mx.bool_))
     mx.eval(model, roper, cache, carry, zeropad, eos_ids)
     def scan_step(prev_carry):
         prev_input_ids, prev_position_ids, prev_mask, prev_goon = prev_carry
         rope = roper(prev_position_ids)
         logits = model(prev_input_ids, prev_mask, rope, cache)
-        next_input_ids = mx.where(prev_goon, mx.argmax(logits[:, -1, :], axis=-1, keepdims=True), eos_id)
-        new_mask = mx.concat([prev_mask[:, :, -1:, 1:], zeropad], axis=-1) # for RollCacher
+        next_input_ids = mx.where(prev_goon, mx.argmax(logits[:, -1, :], axis=-1, keepdims=True), eos_ids[0])
+        new_mask = mx.concat([prev_mask[:, :, -1:, 1:], zeropad], axis=-1)
         # new_goon = prev_goon & (next_input_ids != eos_id)
         is_eos = mx.any(next_input_ids == eos_ids, axis=-1, keepdims=True)
         new_goon = prev_goon & (~is_eos)
@@ -458,12 +460,10 @@ def infer(
     start_tic = time.perf_counter()
     carry, _oid = scan_step(carry)
     mx.eval(carry)
-    # output_ids = [carry[0]]
     output_ids = [_oid]
     prompt_tic = time.perf_counter()
     for i in range(max_new_tokens-1):
         carry, _oid = scan_fn(carry)
-        # output_ids.append(carry[0])
         output_ids.append(_oid)
         ntok+=1
         if i % eval_every == eval_every-1:
@@ -482,7 +482,7 @@ def infer(
     mx.clear_cache()
     output_str = []
     for i, (i_str, o_ids) in enumerate(zip(input_str, output_ids)):
-        o_ids = o_ids[:o_ids.index(eos_id)+1] if eos_id in o_ids else o_ids
+        o_ids = o_ids[:o_ids.index(eos_ids[0])] if eos_ids[0] in o_ids else o_ids # [] ad hoc, should instead slice till any of the eos_id"s"
         o_str = tokenizer.decode(o_ids)
         output_str.append(o_str)
         if verbose:
@@ -491,7 +491,7 @@ def infer(
         _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
     return dict(inp_str=input_str, inp_ids=input_ids, out_str=output_str, out_ids=output_ids)
 # }}} === INFER ===
-# {{{ === T_UTILS ===
+# {{{ === T_UTILS =
 class DoRALinear(nn.Module):
     @staticmethod
     def from_linear(linear, r, alpha, scale, dropout):
@@ -519,12 +519,16 @@ class DoRALinear(nn.Module):
         return weight
 
     def __call__(self, x):
+        bias = self.linear.bias if "bias" in self.linear else 0
         y = self.linear(x)
+        y = y - bias
         z = (self.dropout(x) @ self.lora_a) @ self.lora_b
         z = y + (self.scale * z)
-        adapted = self._dequantized_weight() + (self.scale * self.lora_b.T) @ self.lora_a.T
-        denom = mx.stop_gradient(mx.linalg.norm(adapted, axis=1))
+        w = self._dequantized_weight()
+        adapted = w + (self.scale * self.lora_b.T) @ self.lora_a.T
+        denom = mx.linalg.norm(adapted, axis=1)
         z = (self.m / denom) * z
+        z = z + bias
         return z.astype(x.dtype)
 
 def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scale, lora_dropout):
@@ -575,8 +579,8 @@ class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115 kinda 
     def __init__(self, student):
         super().__init__()
         self.student = student
-        self.log_var_logits = mx.array(0.0)
-        self.log_var_hidden = mx.array(0.0)
+        self.log_var_logits=mx.array(-0.0114311, dtype=mx.float32)
+        self.log_var_hidden=mx.array(0.0341566, dtype=mx.float32)
         if hasattr(student, "teacher_to_student"):
             self.teacher_to_student = student.teacher_to_student
 
@@ -584,7 +588,7 @@ class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115 kinda 
         return self.student(*args, **kwargs)
 
 def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, 
-           teacher=None, temperature=1.0, teacher_to_student=None, 
+           teacher=None, teacher_to_student=None, 
            hidden_loss_weight=1.0):
     cache = [lambda x,y: (x,y)] * config.num_hidden_layers
     t_hiddens = [i[0] for i in teacher_to_student] if teacher_to_student else []
@@ -600,23 +604,36 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
 
         if teacher is not None:
             teacher_logits, teacher_captures = teacher(X, causal_mask, rope, cache, hiddens=t_hiddens)
-            log_p_student = nn.log_softmax(logits / temperature, axis=-1)
-            log_p_teacher = mx.stop_gradient(nn.log_softmax(teacher_logits / temperature, axis=-1))
-            # {{ --- forward kld
-            p_teacher = mx.stop_gradient(mx.exp(log_p_teacher))
-            kld_loss = mx.sum(p_teacher * (log_p_teacher - log_p_student), axis=-1)
-            # }} --- forward kld
-            # # {{ --- reverse kld
+            log_p_student = nn.log_softmax(logits.astype(mx.float32), axis=-1)
+            log_p_teacher = mx.stop_gradient(nn.log_softmax(teacher_logits.astype(mx.float32), axis=-1))
+            # # {{ --- forward kld ---
+            # p_teacher = mx.stop_gradient(mx.exp(log_p_teacher))
+            # kld_loss = mx.sum(p_teacher * (log_p_teacher - log_p_student), axis=-1)
+            # # }} --- forward kld ---
+            # # {{ --- reverse kld ---
             # p_student = mx.exp(log_p_student)
             # kld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
-            # # }} --- reverse kld
-            logit_loss_masked = (kld_loss * label_mask).astype(mx.float32).sum() / label_mask.sum()
-            logit_loss_raw = logit_loss_masked * (temperature ** 2)
-
+            # # }} --- reverse kld ---
+            # {{ --- both kld ---
+            p_teacher = mx.stop_gradient(mx.exp(log_p_teacher))
+            fkld_loss = mx.sum(p_teacher * (log_p_teacher - log_p_student), axis=-1)
+            p_student = mx.exp(log_p_student)
+            rkld_loss = mx.sum(p_student * (log_p_student - log_p_teacher), axis=-1)
+            kld_loss = 0.5*fkld_loss + 0.5*rkld_loss
+            # }} --- both kld ---
+            # # {{ --- jsd ---
+            # p_teacher = mx.stop_gradient(mx.exp(log_p_teacher))
+            # p_student = mx.exp(log_p_student)
+            # p_mix = 0.5 * p_teacher + 0.5 * p_student
+            # log_p_mix = mx.log(p_mix + 1e-10)
+            # kld_loss = 0.5 * mx.sum(p_teacher * (log_p_teacher - log_p_mix), axis=-1) + \
+            #            0.5 * mx.sum(p_student * (log_p_student - log_p_mix), axis=-1)
+            # # }} --- jsd ---
+            # logit_loss_masked = (kld_loss * label_mask).astype(mx.float32).sum()# / label_mask.sum()
+            # logit_loss_raw = logit_loss_masked
             hidden_loss_accum = 0.0
             for s_cap, t_cap in zip(student_captures, teacher_captures):
-                t_cap_detached = mx.stop_gradient(t_cap)
-                
+                t_cap_detached = mx.stop_gradient(t_cap.astype(mx.float32))
                 # # {{ --- mae ---
                 # l1_raw = mx.abs(s_cap - t_cap_detached)
                 # l1_per_token = mx.mean(l1_raw, axis=-1) # Mean over hidden dim
@@ -625,7 +642,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
                 # {{ --- mse ---
                 mse_raw = (s_cap - t_cap_detached) ** 2
                 mse_per_token = mx.mean(mse_raw, axis=-1) # Mean over hidden dim
-                masked_loss = mse_per_token * label_mask
+                # masked_loss = mse_per_token * label_mask
                 # }} --- mse ---
                 # # {{ --- cos ---
                 # layer_loss_raw = -1.0-nn.losses.cosine_similarity_loss(s_cap, t_cap_detached, axis=-1, reduction='none') # {{
@@ -635,20 +652,16 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
                 # # # }}
                 # masked_loss = layer_loss_raw * label_mask 
                 # # }} --- cos ---
-
-                layer_loss = masked_loss.astype(mx.float32).sum() / label_mask.sum()
-                hidden_loss_accum += layer_loss
-
-            hidden_loss_raw = hidden_loss_accum / l_hiddens
-            
+                # layer_loss = masked_loss.astype(mx.float32).sum()# / label_mask.sum()
+                # hidden_loss_accum += layer_loss
+                hidden_loss_accum = hidden_loss_accum + mse_per_token / l_hiddens
+            # hidden_loss_raw = hidden_loss_accum / l_hiddens
             prec_logits = mx.exp(-model.log_var_logits)
             prec_hidden = mx.exp(-model.log_var_hidden)
-            
-            loss_logits = prec_logits * logit_loss_raw + 0.5 * model.log_var_logits
-            loss_hidden = prec_hidden * hidden_loss_raw + 0.5 * model.log_var_hidden
-            
-            return loss_logits + loss_hidden
-            
+            loss_logits = prec_logits * kld_loss + 0.5 * model.log_var_logits
+            loss_hidden = prec_hidden * hidden_loss_accum + 0.5 * model.log_var_hidden
+            hidden_wt = 1.0 # [] or maybe assign (exponentially) lower weights per layer idx?
+            return ((loss_logits + hidden_wt*loss_hidden)*label_mask).astype(mx.float32).sum()# / label_mask.sum()
         else:
             ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
             return ce.astype(mx.float32).sum() / label_mask.sum()
@@ -791,6 +804,7 @@ class RecurrentBlock(nn.Module):
     def __call__(self, x, attention_mask=None, rope=None, cache=None):
         B, L, D = x.shape
         for i in range(self.n_rcr):
+        # for i in range(1): # https://openreview.net/forum?id=ngmEcEer8a
             # if getattr(cache, "rollback", None):
             #     cache.rollback(L*(i>0))
             # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
@@ -809,12 +823,13 @@ def collapse(model, collapse_ranges=None):
     for start, end in collapse_ranges:
         for i in range(start + 1, end):
             indices_to_skip.add(i)
+    teacher_offset = 0
     for i, layer in enumerate(layers):
         student_idx = len(new_layers)
         if i in start_to_range:
             start, end = start_to_range[i]
             n_rcr = end - start
-            teacher_to_student.append((end - 1, student_idx))
+            teacher_to_student.append((teacher_offset+end - 1, student_idx))
             ref_layer = layer
             dim = ref_layer.input_layernorm.weight.shape[0]
             rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr, dim=dim)
@@ -822,29 +837,129 @@ def collapse(model, collapse_ranges=None):
         elif i in indices_to_skip:
             continue
         else:
+            if getattr(layer, 'n_rcr', None):
+                teacher_offset += (layer.n_rcr-1)
             new_layers.append(layer)
     model.model.layers = new_layers
     model.teacher_to_student = teacher_to_student
     return model
 
-def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors'):
+def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-5, bs=1, sl=4096, to='distilled.safetensors'):
     teacher_to_student = getattr(model, "teacher_to_student", None)
+    student_indices = [s[1] for s in teacher_to_student] if teacher_to_student else []
     print(f'{teacher_to_student=}')
     from mlx.utils import tree_unflatten
     model.freeze()
     def to_lora(layer):
         return DoRALinear.from_linear(layer, r=128, alpha=128, scale=0.1, dropout=0.0)
-    for l in model.model.layers:
-        if getattr(l, 'n_rcr', None):
+    for layer_idx, l in enumerate(model.model.layers):
+        if getattr(l, 'n_rcr', None) and (layer_idx in student_indices):
+            print(f'{layer_idx=}')
             loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
             l.update_modules(tree_unflatten(loralized))
-            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
+            # l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('norm') else None)
+    # # # {{ unfreeze all
+    # for l in model.model.layers:
+    #     if getattr(l, 'n_rcr', None):
+    #         l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(('norm', 'lora_a', 'lora_b')) else None)
+    # # # }} unfreeze all
     from datasets import load_dataset
     ds = load_dataset(ds_id, split="test").to_list()
-    ds = ds[:200]
+    ds = ds#[:200]
     ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
     model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
     from mlx.utils import tree_flatten
-    mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
+    # mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
     mx.clear_cache()
+    return model
+
+def cascade(ds_id, model, tokenizer, config, teacher, to='distilled.safetensors', collapse_ranges=None):
+    if collapse_ranges is None:
+        collapse_ranges = [(13,15), (14,16)]
+    for range_tuple in collapse_ranges:
+        model = collapse(model, collapse_ranges=[range_tuple])
+        model = distill(ds_id, model, tokenizer, config, teacher, to=to)
+    return model
+
+def dampen(model, lambda_val=0.3, sim_threshold=0.5, ft_check_rank=1024, verbose=True):
+    import numpy as np
+    from mlx.utils import tree_unflatten
+
+    def to_np(x): 
+        return np.array(x.astype(mx.float32))
+
+    replacements = []
+    
+    for name, module in model.named_modules():
+        if isinstance(module, DoRALinear):
+            if verbose:
+                print(f"[{PRETTY_HW}] Processing {name}...")
+            W_0_mx = module._dequantized_weight()
+            dtype = W_0_mx.dtype
+            delta = (module.scale * module.lora_b.T) @ module.lora_a.T
+            W_prime = W_0_mx + delta
+            
+            norm_W_prime = mx.linalg.norm(W_prime, axis=1, keepdims=True)
+            scale_vec = module.m[:, None] / (norm_W_prime) 
+            W_ft_mx = scale_vec * W_prime
+            
+            W_0 = to_np(W_0_mx)
+            W_ft = to_np(W_ft_mx)
+            
+            U_ft, S_ft, Vt_ft = np.linalg.svd(W_ft, full_matrices=False)
+            U_0, _, _ = np.linalg.svd(W_0, full_matrices=False)
+            U_ref = U_0
+            
+            k_check = min(ft_check_rank, U_ft.shape[1])
+            U_check = U_ft[:, :k_check]
+            
+            projections = np.dot(U_check.T, U_ref)
+            similarities = np.sqrt(np.sum(projections**2, axis=1))
+            
+            is_intruder = similarities < sim_threshold
+            intruder_indices = np.where(is_intruder)[0]
+            
+            if len(intruder_indices) > 0:
+                # # {{{ --- v0 ---
+                # worst_idx_local = np.argmin(similarities[intruder_indices])
+                # worst_idx_global = intruder_indices[worst_idx_local]
+                # worst_sim = similarities[worst_idx_global]
+                # S_new = S_ft.copy()
+                # S_new[worst_idx_global] *= lambda_val
+                # if verbose:
+                #     print(f"   -> Found {len(intruder_indices)} candidates. Dampening rank {worst_idx_global} (Sim: {worst_sim:.4f})")
+                # W_new = (U_ft * S_new[None, :]) @ Vt_ft
+                # W_final_mx = mx.array(W_new)
+                # # }}} --- v0 ---
+                # {{ --- v1 ---
+                worst_idx_local = np.argmin(similarities[intruder_indices])
+                worst_idx_global = intruder_indices[worst_idx_local]
+                worst_sim = similarities[worst_idx_global]
+                remove_factor = (1.0 - lambda_val)
+                intruder_vec = np.outer(U_ft[:, worst_idx_global], Vt_ft[worst_idx_global, :])
+                intruder_component = intruder_vec * S_ft[worst_idx_global]
+                subtraction_matrix = intruder_component * remove_factor
+                if verbose:
+                    print(f"   -> Found {len(intruder_indices)} candidates.")
+                    print(f"   -> Subtracting {(remove_factor*100):.0f}% of rank {worst_idx_global} (Sim: {worst_sim:.4f})")
+                W_final_mx = W_new_mx - mx.array(subtraction_matrix)
+                # }} --- v1 ---
+            # [] maybe after dampening scale weight back to account for removed components?
+            else:
+                if verbose:
+                    print(f"   -> No strong intruders found. Keeping exact weights.")
+                W_final_mx = W_ft_mx
+            out_d, in_d = W_final_mx.shape
+            has_bias = hasattr(module.linear, 'bias') and (module.linear.bias is not None)
+            new_linear = nn.Linear(in_d, out_d, bias=has_bias)
+            new_linear.weight = W_final_mx.astype(dtype)
+            if has_bias:
+                new_linear.bias = module.linear.bias
+            replacements.append((name, new_linear))
+    if replacements:
+        model.update_modules(tree_unflatten(replacements))
+        print(f"[{PRETTY_HW}] Successfully healed and merged {len(replacements)} layers.")
+    else:
+        print("No DoRALinear layers found.")
+    mx.eval(model)
     return model

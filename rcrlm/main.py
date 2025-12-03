@@ -1,5 +1,5 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train, collapse, distill
+from .utils import load_model, load_config, download_repo, infer, train, collapse, distill, cascade, dampen
 from .qwen3 import Qwen3ForCausalLM
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
@@ -26,28 +26,43 @@ def test(task='all'):
         print('〄 Testing collapse...')
         m = load()
         m['model'] = collapse(m['model'])
+        print('✓ Colapsed:')
         _ = infer("Write a story about Einstein\n", **m, stream=False)
-        print('〄 Testing healing...')
         teacher = load()['model']
         m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
+        print('✓ Healed:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+        m['model'] = dampen(m['model'])
+        print('✓ Dampened:')
         _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
         del teacher, m
     if task == 'eval' or task == 'all':
+        print('〄 Testing lm-eval...')
         heal_test_path = 'test_heal.safetensors'
         eval_str = ''
         from .evals import eval_lm
         m = load()
-        print('〄 Testing lm-eval on original model...')
-        eval_str += f'\nOriginal:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
+        eval_str += f'✓ Original:\n{eval_lm(**m)}\n'
         m['model'] = collapse(m['model'])
-        print('〄 Testing lm-eval on collapsed model...')
-        eval_str += f'\nCollapsed:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
+        eval_str += f'✓ Collapsed:\n{eval_lm(**m)}\n'
         teacher = load()['model']
         m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
-        print('〄 Testing lm-eval on healed model...')
-        eval_str += f'\nHealed:\n{eval_lm(**m, chat_template_kwargs=dict(enable_thinking=False))}'
+        eval_str += f'✓ Healed:\n{eval_lm(**m)}\n'
+        m['model'] = dampen(m['model'])
+        eval_str += f'✓ Dampened:\n{eval_lm(**m)}\n'
         print(eval_str)
         del teacher, m
+    if task == 'cascade' or task == 'all':
+        heal_test_path = 'test_heal.safetensors'
+        m = load()
+        print('〄 Testing cascading...')
+        teacher = load()['model']
+        m['model'] = cascade("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
+        print('✓ Cascaded:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+        m['model'] = dampen(m['model'])
+        print('✓ Dampened:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
 
 def load(model_id='Qwen/Qwen3-0.6B'):
     repo_name, model_name = model_id.split('/')

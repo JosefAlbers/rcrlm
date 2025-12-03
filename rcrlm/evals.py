@@ -1,4 +1,4 @@
-from .utils import Roper, create_causal_mask, infer
+from .utils import Roper, create_causal_mask, infer, strftime_now
 from datetime import datetime
 from tqdm import tqdm
 import mlx.core as mx
@@ -9,21 +9,33 @@ from lm_eval.api.registry import register_model
 from lm_eval import simple_evaluate
 from .utils import Roper, create_causal_mask, infer
 
+def _rstrip_until(s, untils):
+    l = len(s)
+    f = [s.find(u) for u in untils]
+    f = [l if x < 0 else x for x in f]
+    return s[: min(f)]
+
+def _lstrip(s, pattern):
+    if (idx := s.find(pattern)) != -1:
+        return s[idx + len(pattern) :]
+    return s
+
 @register_model("my_custom_mlx")
 class MLXCustomEval(LM):
     def __init__(self, model, tokenizer, config, max_new_tokens, batch_size=1, chat_template_kwargs=None):
         super().__init__()
         self._model = model
         self.tokenizer = tokenizer
-        self.config = config
+        self._config = config
         self.batch_size_per_gpu = batch_size
-        self.roper = Roper(self.config) 
+        self.roper = Roper(config) 
         self.max_new_tokens=max_new_tokens
         self.chat_template_kwargs=chat_template_kwargs
-        if isinstance(config.eos_token_id, int):
-            self.eos_token_id = config.eos_token_id
-        else:
-            self.eos_token_id = config.eos_token_id[0]
+        # if isinstance(config.eos_token_id, int):
+        #     self.eos_token_id = config.eos_token_id
+        # else:
+        #     self.eos_token_id = config.eos_token_id[0]
+        self.eos_token_id = config.eos_token_id
 
     def loglikelihood(self, requests):
         results = []
@@ -32,11 +44,32 @@ class MLXCustomEval(LM):
                 context, continuation = request
             else:
                 context, continuation = request.args
-            ctx_ids = self.tokenizer.encode(context)
-            cont_ids = self.tokenizer.encode(continuation)
-            full_ids = ctx_ids + cont_ids
-            input_ids = mx.array([full_ids]) # Batch size 1
-            dummy_cache = [lambda x, y: (x, y)] * self.config.num_hidden_layers
+            # {{
+            iid_a = [self._config.bos_token_id] + self.tokenizer.encode(context+continuation)
+            iid_i = [self._config.bos_token_id] + self.tokenizer.encode(context)
+            start_idx = len(iid_i) - 1
+            input_ids = mx.array([iid_a]) # Batch size 1
+            # }}
+            # # {{
+            # str_a = self.tokenizer.apply_chat_template([{"role": "user", "content": context}, {"role": "assistant", "content": continuation}], strftime_now=strftime_now, **{'add_generation_prompt':False, 'enable_thinking':False})
+            # iid_a = self.tokenizer.encode(str_a)
+            # str_i = self.tokenizer.apply_chat_template([{"role": "user", "content": context}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
+            # iid_i = self.tokenizer.encode(str_i)
+            # cont_ids = iid_a[len(iid_i):]
+            # # iid_o = iid_a[len(iid_i):]
+            # # input_ids = mx.array([iid_i + iid_o])
+            # input_ids = mx.array([iid_a])
+            # start_idx = len(iid_i)-1
+            # # }}
+            # # {{
+            # str_i = self.tokenizer.apply_chat_template([{"role": "user", "content": context}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
+            # iid_i = self.tokenizer.encode(str_i)
+            # cont_ids = self.tokenizer.encode(continuation)
+            # iid_a = iid_i+cont_ids
+            # input_ids = mx.array([iid_a])
+            # start_idx = len(iid_i)-1
+            # # }}
+            dummy_cache = [lambda x, y: (x, y)] * self._config.num_hidden_layers
             X = input_ids[:, :-1]
             y = input_ids[:, 1:]
             seq_len = X.shape[1]
@@ -45,15 +78,12 @@ class MLXCustomEval(LM):
             positions = mx.array([list(range(seq_len))])
             rope = self.roper(positions)
             logits = self._model(X, causal_mask, rope, dummy_cache)
-            start_idx = len(ctx_ids) - 1
-            end_idx = len(full_ids) - 1
-            relevant_logits = logits[:, start_idx:end_idx, :]
-            relevant_targets = mx.array(cont_ids)[None, :]
-            nlls = nn.losses.cross_entropy(relevant_logits, relevant_targets, reduction='none')
-            log_prob_sum = -nlls.sum().item()
-            is_greedy = (relevant_logits.argmax(axis=-1) == relevant_targets).all().item()
+            log_prob_sum = -nn.losses.cross_entropy(logits, y, reduction='none')[:, start_idx:].sum().item()
+            pred_tokens = logits.argmax(axis=-1)[:, start_idx:]
+            target_tokens = y[:, start_idx:]
+            is_greedy = (pred_tokens == target_tokens).all().item()
             result = (log_prob_sum, is_greedy)
-            mx.async_eval(result)
+            mx.eval(result)
             results.append(result)
         return results
 
@@ -71,7 +101,7 @@ class MLXCustomEval(LM):
                 prompts=[context],
                 model=self._model,
                 tokenizer=self.tokenizer,
-                config=self.config,
+                config=self._config,
                 max_new_tokens=max_gen_toks,
                 use_chat_template=True, 
                 stream=False,
@@ -79,9 +109,8 @@ class MLXCustomEval(LM):
                 chat_template_kwargs=self.chat_template_kwargs,
             )
             response = out['out_str'][0]
-            for term in until:
-                if term in response:
-                    response = response.split(term)[0]
+            response = _lstrip(response, '</think>')
+            response = _rstrip_until(response, until)
             results.append(response)
         return results
 
@@ -165,11 +194,11 @@ def plot_results(eval_output):
     
     from lm_eval.utils import make_table
     full_table = make_table(eval_output)
-    summ_table = '\n'.join(f'✓ {k:20}: {v:5.2f}' for k, v in zip(final_tasks, final_values))
+    summ_table = '\n'.join(f'- {k:20}: {v:5.2f}' for k, v in zip(final_tasks, final_values))
     with open(f'{fn}.txt', 'w') as f:
         f.write(full_table+'\n'+summ_table)
     print(full_table)
-    # print(summ_table)
+    print(summ_table)
     # return dict(zip(final_tasks, final_values))
     return summ_table
 
@@ -183,7 +212,7 @@ def eval_lm(model, tokenizer, config,
         # "humaneval", 
     ],
     limit=20,
-    max_new_tokens=512,
+    max_new_tokens=4096,
     chat_template_kwargs=None,
     allow_code_eval=False,
 ):

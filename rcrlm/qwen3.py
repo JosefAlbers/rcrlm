@@ -82,6 +82,8 @@ class Qwen3ForCausalLM(nn.Module):
         self.model = Qwen3Model(config)
         if not tie:
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+        # else:
+        #     self.lm_head = self.model.embed_tokens.as_linear
 
     def __call__(self, input_ids, attention_mask, rope, cache, hiddens=None):
         x, captures = self.model(input_ids, attention_mask=attention_mask, rope=rope, cache=cache, hiddens=hiddens)
@@ -89,6 +91,7 @@ class Qwen3ForCausalLM(nn.Module):
             x = self.model.embed_tokens.as_linear(x)
         else:
             x = self.lm_head(x)
+        # x = self.lm_head(x)
         if hiddens is None:
             return x
         return x, captures
