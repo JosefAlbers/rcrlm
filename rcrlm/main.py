@@ -46,7 +46,7 @@ def test(task='all'):
         m['model'] = collapse(m['model'])
         eval_str += f'✓ Collapsed:\n{eval_lm(**m)}\n'
         teacher = load()['model']
-        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, to=heal_test_path, teacher=teacher)
+        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
         eval_str += f'✓ Healed:\n{eval_lm(**m)}\n'
         m['model'] = dampen(m['model'])
         eval_str += f'✓ Dampened:\n{eval_lm(**m)}\n'
@@ -63,11 +63,33 @@ def test(task='all'):
         m['model'] = dampen(m['model'])
         print('✓ Dampened:')
         _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+    if task == 'rectify' or task == 'all':
+        # print('〄 Testing retnet decoding...')
+        # m = load(extra_config={'rectify':True})
+        # teacher = load()['model']
+        # m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
+        # _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)#, chat_template_kwargs=dict(enable_thinking=False))
+        print('〄 Testing RetNet...')
+        m = load()
+        m['model'] = collapse(m['model'], do_rectify=True)
+        print('✓ Colapsed:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False)
+        teacher = load()['model']
+        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
+        print('✓ Healed:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+        m['model'] = dampen(m['model'])
+        print('✓ Dampened:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+        del teacher, m
 
-def load(model_id='Qwen/Qwen3-0.6B'):
+
+def load(model_id='Qwen/Qwen3-0.6B', extra_config=None):
     repo_name, model_name = model_id.split('/')
     model_path = download_repo(repo_name, model_name)
     model_cfg = load_config(model_path)
+    if extra_config and isinstance(extra_config, dict):
+        model_cfg.extra_config = extra_config
     model_cls = ARCHS.get(model_cfg.architectures[0])
     model = load_model(model_cls, model_path, model_cfg)
     tokenizer = Tokenizer(repo_name='local', model_name=model_path)
