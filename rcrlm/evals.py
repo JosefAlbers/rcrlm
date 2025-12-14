@@ -36,6 +36,7 @@ class MLXCustomEval(LM):
         # else:
         #     self.eos_token_id = config.eos_token_id[0]
         self.eos_token_id = config.eos_token_id
+        self._debug_str = ''
 
     def loglikelihood(self, requests):
         results = []
@@ -47,28 +48,15 @@ class MLXCustomEval(LM):
             # {{
             iid_a = [self._config.bos_token_id] + self.tokenizer.encode(context+continuation)
             iid_i = [self._config.bos_token_id] + self.tokenizer.encode(context)
-            start_idx = len(iid_i) - 1
-            input_ids = mx.array([iid_a]) # Batch size 1
+            # start_idx = len(iid_i) - 1 {{
+            prefix_len = len(iid_i)
+            for i, (t1, t2) in enumerate(zip(iid_i, iid_a)):
+                if t1 != t2:
+                    prefix_len = i
+                    break
+            start_idx = prefix_len-1
             # }}
-            # # {{
-            # str_a = self.tokenizer.apply_chat_template([{"role": "user", "content": context}, {"role": "assistant", "content": continuation}], strftime_now=strftime_now, **{'add_generation_prompt':False, 'enable_thinking':False})
-            # iid_a = self.tokenizer.encode(str_a)
-            # str_i = self.tokenizer.apply_chat_template([{"role": "user", "content": context}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
-            # iid_i = self.tokenizer.encode(str_i)
-            # cont_ids = iid_a[len(iid_i):]
-            # # iid_o = iid_a[len(iid_i):]
-            # # input_ids = mx.array([iid_i + iid_o])
-            # input_ids = mx.array([iid_a])
-            # start_idx = len(iid_i)-1
-            # # }}
-            # # {{
-            # str_i = self.tokenizer.apply_chat_template([{"role": "user", "content": context}], strftime_now=strftime_now, **{'add_generation_prompt':True, 'enable_thinking':False})
-            # iid_i = self.tokenizer.encode(str_i)
-            # cont_ids = self.tokenizer.encode(continuation)
-            # iid_a = iid_i+cont_ids
-            # input_ids = mx.array([iid_a])
-            # start_idx = len(iid_i)-1
-            # # }}
+            input_ids = mx.array([iid_a]) # Batch size 1
             dummy_cache = [lambda x, y: (x, y)] * self._config.num_hidden_layers
             X = input_ids[:, :-1]
             y = input_ids[:, 1:]
@@ -83,6 +71,7 @@ class MLXCustomEval(LM):
             target_tokens = y[:, start_idx:]
             is_greedy = (pred_tokens == target_tokens).all().item()
             result = (log_prob_sum, is_greedy)
+            # self._debug_str += f'⊙ loglikelihood:\n{request=}\n{context=}\n{continuation=}\n{iid_a=}\n{iid_i=}\n{X=}\n{y=}\n{pred_tokens=}\n{target_tokens=}\n{result=}\n'
             mx.eval(result)
             results.append(result)
         return results
@@ -93,6 +82,7 @@ class MLXCustomEval(LM):
             if isinstance(request, tuple):
                 context, gen_kwargs = request
             else:
+                # context = request.doc['question']
                 context, gen_kwargs = request.args
             until = gen_kwargs.get("until", [])
             if isinstance(until, str): until = [until]
@@ -107,43 +97,43 @@ class MLXCustomEval(LM):
                 stream=False,
                 verbose=False,
                 chat_template_kwargs=self.chat_template_kwargs,
+                limit_thinking=True,
             )
             response = out['out_str'][0]
             response = _lstrip(response, '</think>')
             response = _rstrip_until(response, until)
+            # self._debug_str += f'⊙ generate_until:\n{request}\n{context=}\n{gen_kwargs=}\n{out["out_str"]=}\n{response=}\n'
             results.append(response)
         return results
 
     def loglikelihood_rolling(self, requests):
+        print(f'⊙ UHOH {requests=}')
         pass 
-
 
 def plot_results(eval_output):
     import matplotlib.pyplot as plt
     import numpy as np
     results_data = eval_output['results']
     metric_priority = [
-        "exact_match,flexible-extract",
-        "exact_match,get-answer",
+        "pass@1,none",                  
+        "exact_match,flexible-extract", 
+        "exact_match,get-answer",  
+        "exact_match,strict-match",
         "exact_match,none",
-        "acc,none",
-        "acc_norm,none",
-        "exact_match,strict-match"
+        "acc_norm,none",          
+        "acc,none",              
     ]
-
     group_map = {
         "mmlu": "MMLU",
         "gsm8k": "GSM8k",
         "mgsm": "MGSM",
         "gpqa": "GPQA",
         "mbpp": "MBPP",
+        "humaneval": "HumanEval"
     }
-
     grouped_scores = {}
-
     for task_name, metrics in results_data.items():
         score = None
-        
         for key in metric_priority:
             if key in metrics:
                 score = metrics[key]
@@ -151,14 +141,15 @@ def plot_results(eval_output):
         
         if score is None:
             candidates = [v for k, v in metrics.items() 
-                          if isinstance(v, (int, float)) and ('acc' in k or 'match' in k)]
+                          if isinstance(v, (int, float)) 
+                          and any(x in k for x in ['acc', 'match', 'pass'])]
             if candidates:
                 score = max(candidates)
             else:
                 score = 0.0 
+                print(f"Warning: No valid metric found for {task_name}")
 
         display_name = task_name 
-        
         for prefix, group_label in group_map.items():
             if task_name.startswith(prefix):
                 display_name = group_label
@@ -168,51 +159,46 @@ def plot_results(eval_output):
             grouped_scores[display_name] = []
         
         grouped_scores[display_name].append(score)
-
     final_tasks = []
     final_values = []
-
     for name, scores_list in grouped_scores.items():
+        if not scores_list:
+            continue
         avg_score = sum(scores_list) / len(scores_list)
         final_tasks.append(name)
         final_values.append(avg_score)
-
     plt.figure(figsize=(10, 6))
     bars = plt.bar(final_tasks, final_values, color='#88c999', edgecolor='black', alpha=0.7)
-
     for bar in bars:
         height = bar.get_height()
         plt.text(bar.get_x() + bar.get_width()/2., height + 0.02,
                  f'{height:.2f}', ha='center', va='bottom', fontweight='bold')
-
-    plt.title("Model Evaluation Results (Aggregated & Filtered)")
+    plt.title("Model Evaluation Results (Aggregated)")
     plt.ylabel("Score")
     plt.ylim(0, 1.1) 
     plt.grid(axis='y', linestyle='--', alpha=0.3)
     fn = datetime.now().strftime(format="%Y%m%d_%H%M%S")
     plt.savefig(f'{fn}.png')
-    
     from lm_eval.utils import make_table
     full_table = make_table(eval_output)
     summ_table = '\n'.join(f'- {k:20}: {v:5.2f}' for k, v in zip(final_tasks, final_values))
     with open(f'{fn}.txt', 'w') as f:
-        f.write(full_table+'\n'+summ_table)
-    print(full_table)
+        f.write(summ_table +'\n'+ full_table)
     print(summ_table)
-    # return dict(zip(final_tasks, final_values))
+    print(full_table)
     return summ_table
 
 def eval_lm(model, tokenizer, config,
     tasks=[
         "mmlu", 
-        "gpqa_main_zeroshot", 
+        "gpqa_main_n_shot", 
         "gsm8k", 
         "mgsm_direct_zh", 
         # "mbpp", 
         # "humaneval", 
     ],
-    limit=20,
-    max_new_tokens=4096,
+    limit=5,
+    max_new_tokens=512,
     chat_template_kwargs=None,
     allow_code_eval=False,
 ):
@@ -221,15 +207,17 @@ def eval_lm(model, tokenizer, config,
         os.environ["HF_ALLOW_CODE_EVAL"] = "1"
     # mcq: "mmlu", "mmlu_redux", "gpqa"
     # gen: "gsm8k", "gsm8k_cot", "bbh_cot_fewshot", "minerva_math", "mgsm_direct"
-    lm_obj = MLXCustomEval(model=model, tokenizer=tokenizer, config=config, max_new_tokens=max_new_tokens, chat_template_kwargs=chat_template_kwargs)
-    
     print(f"Starting lm-evaluation-harness on: {tasks}")
+    print('{{{ ugh')
+    lm_obj = MLXCustomEval(model=model, tokenizer=tokenizer, config=config, max_new_tokens=max_new_tokens, chat_template_kwargs=chat_template_kwargs)
     results = simple_evaluate(
         model=lm_obj,
         tasks=tasks,
         limit=limit,
         batch_size=1,
-        num_fewshot=0,
+        # num_fewshot=0,
     )
+    print('}}} ugh')
+    print(lm_obj._debug_str)
     plotted = plot_results(results)
     return plotted

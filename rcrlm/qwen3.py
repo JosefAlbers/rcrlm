@@ -23,8 +23,8 @@ class Retention(nn.Module):
         self.k_norm = nn.RMSNorm(config.head_dim, eps=config.rms_norm_eps)
         xmin, xmax = math.log(1 / 32), math.log(1 / 512)
         x = mx.linspace(xmin, xmax, num=n_heads)
-        self._gamma = 1 - x.exp()
-        self.gn_new = nn.GroupNorm(num_groups=n_heads, dims=-1, affine=False)
+        self._gamma = mx.stop_gradient(1 - x.exp())
+        self.gn_new = nn.GroupNorm(num_groups=n_heads, dims=val_dim, affine=False)
         self.rot_dims = rot_dims = None if getattr(config, "partial_rotary_factor", 1.0) >= 1.0 else int(self.head_dim * getattr(config, "partial_rotary_factor", 1.0))
         self.apply_rope = mx.compile(create_rope_applier(rot_dims, config.rope_traditional))
 
@@ -41,18 +41,20 @@ class Retention(nn.Module):
             k = mx.repeat(k, self.n_repeat, axis=1)
             v = mx.repeat(v, self.n_repeat, axis=1)
         if L > 1:
-            out, final_state = self.parallel_retention(q, k, v)
+            prev_s, n_prev = cache.get_sn() if getattr(cache, 'set_sn', None) else (None, 0)
+            out, final_state = self.parallel_retention(q, k, v, prev_s)
             if getattr(cache, 'set_sn', None):
-                cache.set_sn(final_state, L)
+                cache.set_sn(final_state, n_prev + L)
         else:
             out = self.recurrent_retention(q, k, v, cache)
-        out = out.transpose(0, 2, 1, 3).reshape(B, L, -1)
+        out = out.transpose(0, 2, 1, 3).reshape(B*L, -1)
         out = self.gn_new(out)
         g = self.g_proj_new(x)
         out = nn.silu(g) * out
+        out = out.reshape(B, L, -1)
         return self.o_proj(out)
 
-    def parallel_retention(self, q, k, v):
+    def parallel_retention(self, q, k, v, prev_state=None):
         B, H, L, D = q.shape
         q_scaled = q * self.scale
         attn = q_scaled @ k.transpose(0, 1, 3, 2)
@@ -60,7 +62,13 @@ class Retention(nn.Module):
         h = attn @ v
         decay_vec = self._gamma[:, None] ** (L - 1 - mx.arange(L)[None, :])
         k_decayed = k * decay_vec[None, :, :, None]
-        final_state = k_decayed.transpose(0, 1, 3, 2) @ v
+        current_chunk_state = k_decayed.transpose(0, 1, 3, 2) @ v
+        
+        if prev_state is not None:
+            chunk_decay = self._gamma[:, None, None] ** L 
+            final_state = (prev_state * chunk_decay) + current_chunk_state
+        else:
+            final_state = current_chunk_state
         return h, final_state
 
     def recurrent_retention(self, q, k, v, cache):
@@ -121,6 +129,12 @@ class Attention(nn.Module):
         ret_net.o_proj.weight = self.o_proj.weight
         ret_net.q_norm.weight = self.q_norm.weight
         ret_net.k_norm.weight = self.k_norm.weight
+        # {{ init
+        gain = 2**-2.5
+        fan_out, fan_in = ret_net.g_proj_new.weight.shape
+        limit = gain * math.sqrt(6.0 / (fan_in + fan_out))
+        ret_net.g_proj_new.weight = mx.random.uniform(low=-limit, high=limit, shape=ret_net.g_proj_new.weight.shape)
+        # }} init
         return ret_net
 
 class MLP(nn.Module):

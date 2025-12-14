@@ -22,6 +22,29 @@ PRETTY_HW = '─'*30
 def strftime_now(format="%Y-%m-%d %H:%M:%S"):
     return datetime.now().strftime(format)
 
+def print_trainable_parameters(model):
+    from mlx.utils import tree_flatten
+    def get_total_parameters(model):
+        leaf_modules = tree_flatten(
+            model.leaf_modules(), is_leaf=lambda m: isinstance(m, nn.Module)
+        )
+
+        def nparams(m):
+            if hasattr(m, "bits"):
+                n = 0 if not hasattr(m, "bias") else m.bias.size
+                return n + m.weight.size * 32 // m.bits
+            return sum(v.size for _, v in tree_flatten(m.parameters()))
+
+        return sum(nparams(m) for _, m in leaf_modules)
+    total_p = get_total_parameters(model) / 1e6
+    trainable_p = (
+        sum(v.size for _, v in tree_flatten(model.trainable_parameters())) / 1e6
+    )
+    print(
+        f"Trainable parameters: {(trainable_p * 100 / total_p):.3f}% "
+        f"({trainable_p:.3f}M/{total_p:.3f}M)"
+    )
+
 def tqdm_hook(t):
     last_b = [0]
     def update_to(block_num=1, block_size=1, total_size=None):
@@ -137,7 +160,6 @@ def load_model(model_cls, model_dir, model_cfg):
         if getattr(model_cfg, 'sanitized', False):
             return [(k, v) for wf in glob.glob(f"{model_dir}/*.safetensors") for k, v in mx.load(wf).items()]
         return [(k, v.transpose(0, 2, 3, 1) if "patch_embedding.weight" in k else v) for wf in glob.glob(f"{model_dir}/*.safetensors") for k, v in mx.load(wf).items()]
-
     model = model_cls(model_cfg)
     model.load_weights(_get_wt(model_dir, model_cfg), strict=False)
     mx.eval(model)
@@ -391,7 +413,14 @@ def infer(
     use_jit = True,
     chat_template_kwargs = None,
     verbose = True,
+    limit_thinking=False,
 ):
+    if limit_thinking is True:
+        end_think_id = tokenizer.encode('</think>')
+        end_think_id = end_think_id[-1]
+    else:
+        end_think_id = None
+
     if lora_path and os.path.exists(lora_path):
         def decode_metadata(meta):
             out = {}
@@ -407,7 +436,7 @@ def infer(
         lora_wts, lora_cfg = mx.load(lora_path, return_metadata=True)
         lora_cfg = decode_metadata(lora_cfg)
         model.freeze()
-        linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
+        linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'], lora_quantize=lora_cfg['quantize'],lora_class=eval(lora_cfg['kind']))
         model.load_weights(lora_wts, strict=False)
         model.apply_to_modules(lambda k, v: v.unfreeze() if any(k.endswith(t) for t in lora_cfg['thaws']) else None)
         mx.eval(model)
@@ -421,9 +450,13 @@ def infer(
             if 'add_generation_prompt' not in chat_template_kwargs:
                 chat_template_kwargs['add_generation_prompt'] = True
             prompts = [tokenizer.apply_chat_template([{"role": "user", "content": prompt}], strftime_now=strftime_now, **chat_template_kwargs) for prompt in prompts]
+            input_str, input_ids, position_ids, padding_mask = tokenizer(prompts)
         except Exception as e:
             print(e)
-    input_str, input_ids, position_ids, padding_mask = tokenizer(prompts)
+    else:
+        tokens = [[config.bos_token_id]+tokenizer.encode(_p) for _p in prompts]
+        input_ids, position_ids, padding_mask = tokenizer.pad_token_sequences(tokens, 1, 1)
+        input_str = [tokenizer.decode(_t) for _t in tokens]
     input_ids = mx.array(input_ids)
     B, L = input_ids.shape
     position_ids = mx.array(position_ids)
@@ -431,28 +464,6 @@ def infer(
     roper = Roper(config, total_len)
     causal_mask = create_causal_mask(padding_mask)
     causal_mask = mx.pad(causal_mask, ((0,0), (0,0), (0,0), (max_new_tokens,0)), 'constant', constant_values=False)
-    # # {{{ v0
-    # model_tts = getattr(model, "teacher_to_student", None)
-    # if model_tts:
-    #     rcr_layers = {s:(t-s+1) for t, s in model_tts}
-    #     cache = [[RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(rcr_layers[i])] if i in rcr_layers else RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for i in range(len(model.model.layers))]
-    #     # print(f'{rcr_layers=}')
-    #     # print(f'{cache=}')
-    # else:
-    #     cache = [RollCacher(config.dtype, B, config.num_key_value_heads, total_len, config.head_dim) for _ in range(config.num_hidden_layers)]
-    # # }}} v0
-    # # {{{ v1
-    # cache = []
-    # _Cacher, c_heads = (RetCacher, config.num_attention_heads) if config.extra_config.get('rectify', False) else (RollCacher, config.num_key_value_heads)
-    # for _layer_elm in model.model.layers:
-    #     _n_rcr = getattr(_layer_elm, 'n_rcr', None)
-    #     if _n_rcr:
-    #         _layer_cch = [_Cacher(config.dtype, B, c_heads, total_len, config.head_dim) for _ in range(_n_rcr)]
-    #     else:
-    #         _layer_cch = _Cacher(config.dtype, B, c_heads, total_len, config.head_dim)
-    #     cache.append(_layer_cch)
-    # # }}} v1
-    # {{ v2
     cache = []
     for _layer_elm in model.model.layers:
         _n_rcr = getattr(_layer_elm, 'n_rcr', None)
@@ -463,8 +474,7 @@ def infer(
             _Cacher, c_heads = (RollCacher, config.num_key_value_heads) if getattr(_layer_elm.self_attn, 'to_retention', None) else (RetCacher, config.num_attention_heads)
             _layer_cch = _Cacher(config.dtype, B, c_heads, total_len, config.head_dim)
         cache.append(_layer_cch)
-    # }} v2
-    zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_) # for boolean masking
+    zeropad = mx.ones((B, 1, 1, 1), dtype=mx.bool_)
     goon = mx.ones((B, 1), dtype=mx.bool_)
     eos_ids = [config.eos_token_id] if isinstance(config.eos_token_id, int) else config.eos_token_id # ad hoc
     eos_ids = mx.array(eos_ids)
@@ -476,12 +486,11 @@ def infer(
         logits = model(prev_input_ids, prev_mask, rope, cache)
         next_input_ids = mx.where(prev_goon, mx.argmax(logits[:, -1, :], axis=-1, keepdims=True), eos_ids[0])
         new_mask = mx.concat([prev_mask[:, :, -1:, 1:], zeropad], axis=-1)
-        # new_goon = prev_goon & (next_input_ids != eos_id)
         is_eos = mx.any(next_input_ids == eos_ids, axis=-1, keepdims=True)
         new_goon = prev_goon & (~is_eos)
         next_position_ids = prev_position_ids[:, -1:] + 1
         new_carry = (next_input_ids, next_position_ids, new_mask, new_goon)
-        return new_carry, next_input_ids
+        return new_carry#, next_input_ids
     if use_jit:
         scan_fn = mx.compile(scan_step, inputs=cache, outputs=cache)
     else:
@@ -492,13 +501,27 @@ def infer(
     nbuf=eval_every//2
     ntok=1
     start_tic = time.perf_counter()
-    carry, _oid = scan_step(carry)
+    # carry, _oid = scan_step(carry)
+    carry = scan_step(carry)
     mx.eval(carry)
-    output_ids = [_oid]
+    output_ids = [carry[0]]
     prompt_tic = time.perf_counter()
     for i in range(max_new_tokens-1):
-        carry, _oid = scan_fn(carry)
-        output_ids.append(_oid)
+        carry = scan_fn(carry)
+        # carry, _oid = scan_fn(carry)
+        # {{ limit thinking
+        if end_think_id is not None and i == int(0.75*max_new_tokens):
+            cat_oids = mx.concat(output_ids, axis=1)
+            is_done = mx.any(cat_oids == end_think_id, axis=-1, keepdims=True)
+            # print(f'{tokenizer.decode(cat_oids[-1].tolist())=}')
+            # print(f'{is_done=}')
+            _carry_0 = carry[0]
+            _carry_0 = mx.where(is_done, _carry_0, end_think_id)
+            # print(f'{_carry_0=}')
+            carry = tuple([_carry_0, *carry[1:]])
+            # print(f'{carry=}')
+        # }} limit thinking
+        output_ids.append(carry[0])
         ntok+=1
         if i % eval_every == eval_every-1:
             if stream:
@@ -516,7 +539,7 @@ def infer(
     mx.clear_cache()
     output_str = []
     for i, (i_str, o_ids) in enumerate(zip(input_str, output_ids)):
-        o_ids = o_ids[:o_ids.index(eos_ids[0])] if eos_ids[0] in o_ids else o_ids # [] ad hoc, should instead slice till any of the eos_id"s"
+        o_ids = o_ids[:o_ids.index(eos_ids[0])+1] if eos_ids[0] in o_ids else o_ids # [] ad hoc, should instead slice till any of the eos_id"s"
         o_str = tokenizer.decode(o_ids)
         output_str.append(o_str)
         if verbose:
@@ -525,7 +548,7 @@ def infer(
         _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
     return dict(inp_str=input_str, inp_ids=input_ids, out_str=output_str, out_ids=output_ids)
 # }}} === INFER ===
-# {{{ === T_UTILS =
+# {{{ === DoRA ===
 class DoRALinear(nn.Module):
     @staticmethod
     def from_linear(linear, r, alpha, scale, dropout):
@@ -541,7 +564,6 @@ class DoRALinear(nn.Module):
         self.linear = nn.Linear(input_dims, output_dims, bias=bias)
         self.dropout = nn.Dropout(p=dropout)
         self.scale = scale * (alpha / r)
-        # self.scale = 1 / math.sqrt(r)
         init_scale = 1 / math.sqrt(input_dims)
         self.lora_a = mx.random.uniform(low=-init_scale, high=init_scale, shape=(input_dims, r))
         self.lora_b = mx.zeros(shape=(r, output_dims))
@@ -566,7 +588,9 @@ class DoRALinear(nn.Module):
         z = z + bias
         return z#.astype(x.dtype)
 
-def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scale, lora_dropout):
+def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scale, lora_dropout, lora_quantize, lora_class):
+    if lora_quantize:
+        nn.quantize(model, 32, 8, class_predicate=lambda p, m: (isinstance(m, nn.Linear) or isinstance(m, nn.Embedding)) and not p.endswith('_new'))
     _model = model.model
     from mlx.utils import tree_unflatten
     if lora_layers == 'all':
@@ -578,15 +602,160 @@ def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scal
     else:
         raise ValueError("Invalid type for lora_layers. Expected int (number of layers) or list (layer indices or names).")
     def to_lora(layer):
-        return DoRALinear.from_linear(layer, r=lora_rank, alpha=lora_rank, scale=lora_scale, dropout=lora_dropout)
+        return lora_class.from_linear(layer, r=lora_rank, alpha=lora_rank, scale=lora_scale, dropout=lora_dropout)
     for l in lora_layers:
         loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
         l.update_modules(tree_unflatten(loralized))
-# }}} === T_UTILS ===
+# }}} === DoRA ===
+# {{{ === LoRA-XS ===
+class LoRAXSLinear(nn.Module):
+    @staticmethod
+    def from_linear(linear, r, dropout=0.0, verbose=False, **kwargs):
+        if isinstance(linear, nn.QuantizedLinear):
+            w = mx.dequantize(linear.weight, linear.scales, linear.biases, linear.group_size, linear.bits)
+        else:
+            w = linear.weight
+        import numpy as np
+        w_np = np.array(w.astype(mx.float32)) # shape (out, in)
+        U, S, Vt = np.linalg.svd(w_np, full_matrices=False)
+        U_r = mx.array(U[:, :r])
+        Vt_r = mx.array(Vt[:r, :])
+        if verbose:
+            print(f"   -> Init LoRA-XS: {w.shape} -> r={r} (Params: {r*r})")
+        return LoRAXSLinear(linear, U_r, Vt_r, r, dropout)
+
+    def __init__(self, linear, U, Vt, r, dropout=0.0):
+        super().__init__()
+        self.linear = linear
+        self.dropout = nn.Dropout(p=dropout)
+        self.U = mx.stop_gradient(U) 
+        self.Vt = mx.stop_gradient(Vt)
+        self.R = mx.zeros((r, r))
+
+    def __call__(self, x):
+        y = self.linear(x)
+        h = self.dropout(x) @ self.Vt.T
+        h = h @ self.R.T
+        h = h @ self.U.T
+        return y + h
+# }}} === LoRA-XS ===
+# {{{ === DRINK ===
+class LowRankLinear(nn.Module):
+    @staticmethod
+    def from_linear(linear, U, S, Vt, rank):
+        U_k = U[:, :rank]
+        S_k = S[:rank]
+        Vt_k = Vt[:rank, :]
+        # {{ v0
+        # A_np = U_k * S_k[None, :]
+        # B_np = Vt_k
+        # }} v0
+        # {{ v1
+        import numpy as np
+        sqrt_S = np.sqrt(S_k)
+        A_np = U_k * sqrt_S[None, :]  
+        B_np = sqrt_S[:, None] * Vt_k 
+        # }} v1
+        out_dims, in_dims = linear.weight.shape
+        bias = "bias" in linear
+        lrl = LowRankLinear(in_dims, out_dims, rank, bias)
+        lrl.lora_b.weight = mx.array(B_np, dtype=linear.weight.dtype) 
+        lrl.lora_a.weight = mx.array(A_np, dtype=linear.weight.dtype)
+        if bias:
+            lrl.lora_a.bias = linear.bias
+        return lrl
+
+    def __init__(self, in_dims, out_dims, rank, bias=False):
+        super().__init__()
+        self.lora_b = nn.Linear(in_dims, rank, bias=False)
+        self.lora_a = nn.Linear(rank, out_dims, bias=bias)
+
+    def __call__(self, x):
+        return self.lora_a(self.lora_b(x))
+
+def drink(model, compression_ratio=0.2, dry_run=False):
+    import numpy as np
+    targets = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
+               "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"]
+    layers = model.model.layers
+    stats = []
+    pbar = tqdm(total=len(layers) * len(targets), desc="Analyzing Effective Ranks")
+    total_params_original = 0
+    for i, layer in enumerate(layers):
+        for name, module in layer.named_modules():
+            if any(t in name for t in targets) and isinstance(module, nn.Linear):
+                if isinstance(module, nn.QuantizedLinear):
+                    W = mx.dequantize(module.weight, module.scales, module.biases, module.group_size, module.bits)
+                else:
+                    W = module.weight
+                W_np = np.array(W.astype(mx.float32))
+                out_d, in_d = W_np.shape
+                total_params_original += (out_d * in_d)
+                try:
+                    U, S, Vt = np.linalg.svd(W_np, full_matrices=False)
+                except np.linalg.LinAlgError:
+                    print(f"   ! SVD failed for layer {i} {name}, skipping.")
+                    continue
+                p = S / np.sum(S)
+                entropy = -np.sum(p * np.log(p + 1e-12))
+                eff_rank = np.exp(entropy)
+                stats.append({
+                    'layer_idx': i,
+                    'name': name,
+                    'module': module,
+                    'U': U,
+                    'S': S,
+                    'Vt': Vt,
+                    'eff_rank': eff_rank,
+                    'shape': (out_d, in_d),
+                    'full_path': f"{i}.{name}"
+                })
+                pbar.update(1)
+    pbar.close()
+    if not stats:
+        print("No eligible layers found.")
+        return model
+    target_params = total_params_original * (1.0 - compression_ratio)
+    denom = sum((s['shape'][0] + s['shape'][1]) * s['eff_rank'] for s in stats)
+    alpha = target_params / denom
+    for s in stats:
+        k_target = int(alpha * s['eff_rank'])
+        max_rank = min(s['shape'])
+        k_target = max(32, min(k_target, max_rank))
+        if "v_proj" in s['name']:
+            k_target = int(k_target * 1.1)
+        elif "q_proj" in s['name'] or "k_proj" in s['name']:
+            k_target = int(k_target * 0.9)
+        k_target = min(k_target, max_rank)
+        current_params = s['shape'][0] * s['shape'][1]
+        new_params = (s['shape'][0] + s['shape'][1]) * k_target
+        if new_params >= current_params:
+            if dry_run: print(f"   Skipping {s['full_path']}: Compress ({new_params}) > Org ({current_params})")
+            continue
+        if dry_run:
+            print(f"   {s['full_path']:<40} | EffR: {s['eff_rank']:6.1f} | k: {max_rank} -> {k_target}")
+        else:
+            lrl = LowRankLinear.from_linear(s['module'], s['U'], s['S'], s['Vt'], k_target)
+            layer = layers[s['layer_idx']]
+            parts = s['name'].split('.')
+            parent = layer
+            for p in parts[:-1]:
+                parent = getattr(parent, p)
+            setattr(parent, parts[-1], lrl)
+    if dry_run:
+        print("[Dry Run] No changes applied.")
+    else:
+        mx.eval(model)
+    model.teacher_to_student = [(_l, _l) for _l in range(len(model.model.layers))]
+    return model
+# }}} === DRINK ===
 # {{{ === TRAIN ===
 def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, lora_cfg=None):
     LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
                     thaws=['norm'], wt_from=None, wt_to='saved_lora.safetensors',
+                    # kind='LoRAXSLinear',
+                    kind='DoRALinear',
+                    quantize=True,
     )
     if lora_cfg is None:
         lora_cfg = {}
@@ -594,7 +763,7 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
         lora_cfg = lora_cfg|dict(wt_to=strftime_now("%Y%m%d_%H%M%S.safetensors"))
     lora_cfg = LORA_CFG|lora_cfg
     model.freeze()
-    linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'])
+    linear_to_lora_layers(model, lora_layers=lora_cfg['layers'], lora_targets=lora_cfg['targets'], lora_rank=lora_cfg['rank'], lora_scale=lora_cfg['scale'], lora_dropout=lora_cfg['dropout'], lora_quantize=lora_cfg['quantize'], lora_class=eval(lora_cfg['kind']))
     if lora_cfg['wt_from'] and os.path.exists(lora_cfg['wt_from']):
         model.load_weights(lora_cfg['wt_from'], strict=False)
     model.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(tuple(lora_cfg['thaws'])) else None)
@@ -614,18 +783,18 @@ class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115 kinda 
     def __init__(self, student):
         super().__init__()
         self.student = student
-
         self.log_var_logits=mx.array(-0.0821954, dtype=mx.float32)
-        self.log_var_hidden=mx.array(0.494292, dtype=mx.float32)
         if hasattr(student, "teacher_to_student"):
             self.teacher_to_student = student.teacher_to_student
-
+            self.log_var_hiddens = [mx.array(0.494292, dtype=mx.float32) for _ in range(len(student.teacher_to_student))]
+        else:
+            self.log_var_hiddens = None
     def __call__(self, *args, **kwargs):
         return self.student(*args, **kwargs)
 
 def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, 
            teacher=None, teacher_to_student=None, 
-           hidden_loss_weight=1.0):
+           hidden_wt=2.0):
     cache = [lambda x,y: (x,y)] * config.num_hidden_layers
     t_hiddens = [i[0] for i in teacher_to_student] if teacher_to_student else []
     s_hiddens = [i[1] for i in teacher_to_student] if teacher_to_student else []
@@ -665,39 +834,27 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             # kld_loss = 0.5 * mx.sum(p_teacher * (log_p_teacher - log_p_mix), axis=-1) + \
             #            0.5 * mx.sum(p_student * (log_p_student - log_p_mix), axis=-1)
             # # }} --- jsd ---
-            # logit_loss_masked = (kld_loss * label_mask).astype(mx.float32).sum()# / label_mask.sum()
-            # logit_loss_raw = logit_loss_masked
+            prec_logits = mx.exp(-model.log_var_logits)
+            loss_logits = prec_logits * kld_loss + 0.5 * model.log_var_logits
             hidden_loss_accum = 0.0
-            for s_cap, t_cap in zip(student_captures, teacher_captures):
+            for idx_cap, (s_cap, t_cap) in enumerate(zip(student_captures, teacher_captures)):
                 t_cap_detached = mx.stop_gradient(t_cap.astype(mx.float32))
-                # # {{ --- mae ---
-                # l1_raw = mx.abs(s_cap - t_cap_detached)
-                # l1_per_token = mx.mean(l1_raw, axis=-1) # Mean over hidden dim
-                # masked_loss = l1_per_token * label_mask
-                # # }} --- mae ---
                 # {{ --- mse ---
                 mse_raw = (s_cap - t_cap_detached) ** 2
-                mse_per_token = mx.mean(mse_raw, axis=-1) # Mean over hidden dim
-                # masked_loss = mse_per_token * label_mask
+                loss_per_token = mx.mean(mse_raw, axis=-1) # Mean over hidden dim
                 # }} --- mse ---
                 # # {{ --- cos ---
-                # layer_loss_raw = -1.0-nn.losses.cosine_similarity_loss(s_cap, t_cap_detached, axis=-1, reduction='none') # {{
-                # # s_norm = s_cap / (mx.linalg.norm(s_cap, axis=-1, keepdims=True) + 1e-6)
-                # # t_norm = t_cap_detached / (mx.linalg.norm(t_cap_detached, axis=-1, keepdims=True) + 1e-6)
-                # # layer_loss_raw = 1.0 - mx.sum(s_norm * t_norm, axis=-1)
-                # # # }}
-                # masked_loss = layer_loss_raw * label_mask 
+                # dot_prod = mx.sum(s_cap * t_cap_detached, axis=-1)
+                # norm_s = mx.sqrt(mx.sum(mx.square(s_cap), axis=-1) + 1e-9)
+                # norm_t = mx.sqrt(mx.sum(mx.square(t_cap_detached), axis=-1) + 1e-9)
+                # cos_sim = dot_prod / (norm_s * norm_t)
+                # loss_per_token = 1.0 - cos_sim
                 # # }} --- cos ---
-                # layer_loss = masked_loss.astype(mx.float32).sum()# / label_mask.sum()
-                # hidden_loss_accum += layer_loss
-                hidden_loss_accum = hidden_loss_accum + mse_per_token / l_hiddens
-            # hidden_loss_raw = hidden_loss_accum / l_hiddens
-            prec_logits = mx.exp(-model.log_var_logits)
-            prec_hidden = mx.exp(-model.log_var_hidden)
-            loss_logits = prec_logits * kld_loss + 0.5 * model.log_var_logits
-            loss_hidden = prec_hidden * hidden_loss_accum + 0.5 * model.log_var_hidden
-            hidden_wt = 2.0 # [] or maybe assign (exponentially) lower weights per layer idx?
-            return ((loss_logits + hidden_wt*loss_hidden)*label_mask).astype(mx.float32).sum() / label_mask.sum()
+                log_var = model.log_var_hiddens[idx_cap] 
+                prec = mx.exp(-log_var)
+                layer_loss = prec * loss_per_token + 0.5 * log_var
+                hidden_loss_accum = hidden_loss_accum + layer_loss
+            return ((loss_logits + hidden_wt*hidden_loss_accum)*label_mask).astype(mx.float32).sum() / label_mask.sum()
         else:
             ce = nn.losses.cross_entropy(logits, y, reduction='none') * label_mask
             return ce.astype(mx.float32).sum() / label_mask.sum()
@@ -718,7 +875,8 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
         model.train()
         total_loss = num_batches = 0
         ds = random.sample(ds, len(ds))
-        for i in range(0, len(ds), bs): 
+        pbar = tqdm(range(0, len(ds), bs), desc=f"Epoch {epoch+1}/{n_epochs}")
+        for i in pbar:
             batch_rows = ds[i:i+bs]
             _Xs = []
             _ys = []
@@ -768,6 +926,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
             mx.eval(loss, model, optimizer)
             total_loss += loss.item()
             num_batches += 1
+            pbar.set_postfix({'loss': f'{loss.item():.3f}'})
         avg_loss = total_loss / len(ds)
         elp_train = time.perf_counter() - tic_train
         print(f'{epoch=:5d} {avg_loss=:8.2f} {elp_train=:8.2f}')
@@ -777,7 +936,7 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
         print('└ test output:', _dict_eval['out_str'])
         
     if teacher is not None:
-        print(model.log_var_logits, model.log_var_hidden)
+        # print(model.log_var_logits, model.log_var_hiddens)
         return model.student
     return model
 
@@ -831,100 +990,116 @@ def svdlora(model, tokenizer, config, collapse_cfg=None):
     print(f'{w0_recon=}')
     elp_clp = time.perf_counter() - tic_clp
     print(f'{elp_clp=:.1f}')
-# }}} === SVD ===
-class RecurrentBlock(nn.Module):
-    def __init__(self, layer, n_rcr=3):
-        super().__init__()
-        # attn = layer.self_attn
-        # ret_net = Retention(config)
-        # ret_net.q_proj.weight = attn.q_proj.weight
-        # ret_net.k_proj.weight = attn.k_proj.weight
-        # ret_net.v_proj.weight = attn.v_proj.weight
-        # ret_net.o_proj.weight = attn.o_proj.weight
-        # ret_net.q_norm.weight = attn.q_norm.weight
-        # ret_net.k_norm.weight = attn.k_norm.weight
-        # layer.sef_attn = ret_net
-        self.layer = layer
-        self.n_rcr = n_rcr
 
-    def __call__(self, x, attention_mask=None, rope=None, cache=None):
-        B, L, D = x.shape
-        for i in range(self.n_rcr):
-        # for i in range(1): # https://openreview.net/forum?id=ngmEcEer8a
-            # if getattr(cache, "rollback", None):
-            #     cache.rollback(L*(i>0))
-            # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
-            c = cache[i] if isinstance(cache, list) else cache
-            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=c)
-        return x
+def prune(calib_ds_id, model, tokenizer, config, n_samples=64, bs=4, lambda_val=1.0, prune_ratio=0.3, verbose=True):
+    class UniQL_MLP_Collector(nn.Module):
+        def __init__(self, original_mlp, layer_idx, stats_dict, counts_dict):
+            super().__init__()
+            self.target = original_mlp 
+            self.layer_idx = layer_idx
+            self.stats = stats_dict
+            self.counts = counts_dict
 
-def collapse(model, collapse_ranges=None, do_rectify=False):
-    if collapse_ranges is None:
-        collapse_ranges = [(13,17)]
-    layers = model.model.layers
-    new_layers = []
-    teacher_to_student = [] 
-    start_to_range = {start: (start, end) for start, end in collapse_ranges}
-    indices_to_skip = set()
-    for start, end in collapse_ranges:
-        for i in range(start + 1, end):
-            indices_to_skip.add(i)
-    teacher_offset = 0
-    for i, layer in enumerate(layers):
-        student_idx = len(new_layers)
-        if i in start_to_range:
-            start, end = start_to_range[i]
-            n_rcr = end - start
-            teacher_to_student.append((teacher_offset+end - 1, student_idx))
-            ref_layer = layer
-            if hasattr(ref_layer.self_attn, 'to_retention') and do_rectify:
-                ref_layer.self_attn = ref_layer.self_attn.to_retention(model._config)
-            # dim = ref_layer.input_layernorm.weight.shape[0]
-            rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr)
-            new_layers.append(rec_block)
-        elif i in indices_to_skip:
-            continue
-        else:
-            if getattr(layer, 'n_rcr', None):
-                teacher_offset += (layer.n_rcr-1)
-            new_layers.append(layer)
-    model.model.layers = new_layers
-    model.teacher_to_student = teacher_to_student
-    return model
+        def __call__(self, x):
+            gate = self.target.gate_proj(x)
+            up = self.target.up_proj(x)
+            h = nn.silu(gate) * up
+            h_flat = h.reshape(-1, h.shape[-1])
+            h_f32 = mx.stop_gradient(h_flat).astype(mx.float32)
+            c_batch = h_f32.T @ h_f32
+            if self.layer_idx not in self.stats:
+                self.stats[self.layer_idx] = c_batch
+                self.counts[self.layer_idx] = h_flat.shape[0]
+            else:
+                self.stats[self.layer_idx] = self.stats[self.layer_idx] + c_batch
+                self.counts[self.layer_idx] = self.counts[self.layer_idx] + h_flat.shape[0]
+            return self.target.down_proj(h)
 
-def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors'):
-    teacher_to_student = getattr(model, "teacher_to_student", None)
-    student_indices = [s[1] for s in teacher_to_student] if teacher_to_student else []
-    print(f'{teacher_to_student=}')
-    from mlx.utils import tree_unflatten
-    model.freeze()
-    def to_lora(layer):
-        _rank = 64
-        return DoRALinear.from_linear(layer, r=_rank, alpha=_rank, scale=1/math.sqrt(_rank), dropout=0.0)
-    for layer_idx, l in enumerate(model.model.layers):
-        if getattr(l, 'n_rcr', None) and (layer_idx in student_indices):
-            print(f'{layer_idx=}')
-            loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k.endswith('proj')]
-            l.update_modules(tree_unflatten(loralized))
-            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('_new') else None)
-    # # # {{ unfreeze all
-    # for l in model.model.layers:
-    #     if getattr(l, 'n_rcr', None):
-    #         l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(('norm', 'lora_a', 'lora_b')) else None)
-    # # # }} unfreeze all
+    stats = {} 
+    counts = {}
+    original_mlps = {}
+    
+    for i, layer in enumerate(model.model.layers):
+        original_mlps[i] = layer.mlp
+        layer.mlp = UniQL_MLP_Collector(layer.mlp, i, stats, counts)
+
     from datasets import load_dataset
-    ds = load_dataset(ds_id, split="test").to_list()
-    ds = ds#[:200]
-    ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
-    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
-    from mlx.utils import tree_flatten
-    # mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
-    mx.clear_cache()
+    ds = load_dataset(calib_ds_id, split="test", streaming=True)
+    data_iter = iter(ds)
+    
+    model.eval()
+    processed = 0
+    pbar = tqdm(total=n_samples, desc="Calibrating MLP")
+    cache = [lambda x, y: (x, y)] * len(model.model.layers)
+
+    while processed < n_samples:
+        batch_prompts = []
+        for _ in range(bs):
+            try:
+                row = next(data_iter)
+                txt = row.get('text', row.get('prompt', row.get('description', ''))) # ad hoc
+                if txt: batch_prompts.append(txt)
+            except StopIteration:
+                break
+        
+        if not batch_prompts: break
+
+        for txt in batch_prompts:
+            if processed >= n_samples: break
+            ids = tokenizer.encode(txt)
+            if len(ids) == 0: continue
+            ids = mx.array([ids])
+            B, L = ids.shape
+            roper = Roper(config, L)
+            rope = roper(mx.arange(L)[None, :])
+            mask = create_causal_mask(mx.array([[True]*L]))
+            try:
+                model(ids, mask, rope, cache)
+                mx.eval(stats)
+            except Exception as e:
+                print(f"Warning: Batch failed {e}")
+            processed += 1
+            pbar.update(1)
+    pbar.close()
+
+    for i, layer in enumerate(model.model.layers):
+        layer.mlp = original_mlps[i]
+
+    if not stats:
+        print("Error: No stats collected.")
+        return model
+
+    for i in range(len(model.model.layers)):
+        if i not in stats: continue
+        
+        C = stats[i] / counts[i]
+        D_int = C.shape[0]
+        
+        reg = C + (lambda_val * mx.eye(D_int, dtype=mx.float32))
+        reg_inv = mx.linalg.inv(reg, stream=mx.cpu)
+        s = mx.diag(C @ reg_inv)
+
+        perm = mx.argsort(s)[::-1]
+        
+        mlp = model.model.layers[i].mlp
+        
+        mlp.gate_proj.weight = mlp.gate_proj.weight[perm]
+        mlp.up_proj.weight   = mlp.up_proj.weight[perm]
+        mlp.down_proj.weight = mlp.down_proj.weight[:, perm]
+
+        if prune_ratio > 0.0:
+            keep = int(D_int * (1.0 - prune_ratio))
+            mlp.gate_proj.weight = mlp.gate_proj.weight[:keep]
+            mlp.up_proj.weight   = mlp.up_proj.weight[:keep]
+            mlp.down_proj.weight = mlp.down_proj.weight[:, :keep]
+            if i == 0 and verbose: print(f"   Layer 0 pruned to {keep}/{D_int}")
+
+    mx.eval(model)
     return model
 
 def cascade(ds_id, model, tokenizer, config, teacher, to='distilled.safetensors', collapse_ranges=None):
     if collapse_ranges is None:
-        collapse_ranges = [(13,15), (14,16)]
+        collapse_ranges = [(9,13), (13,17)]
     for range_tuple in collapse_ranges:
         model = collapse(model, collapse_ranges=[range_tuple])
         model = distill(ds_id, model, tokenizer, config, teacher, to=to)
@@ -1013,22 +1188,84 @@ def dampen(model, lambda_val=0.3, sim_threshold=0.5, ft_check_rank=1024, verbose
         print("No DoRALinear layers found.")
     mx.eval(model)
     return model
+# }}} === SVD ===
+class RecurrentBlock(nn.Module):
+    def __init__(self, layer, n_rcr=3):
+        super().__init__()
+        self.layer = layer
+        self.n_rcr = n_rcr
 
+    def __call__(self, x, attention_mask=None, rope=None, cache=None):
+        B, L, D = x.shape
+        for i in range(self.n_rcr):
+        # for i in range(1): # https://openreview.net/forum?id=ngmEcEer8a
+            # if getattr(cache, "rollback", None):
+            #     cache.rollback(L*(i>0))
+            # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
+            c = cache[i] if isinstance(cache, list) else cache
+            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=c)
+        return x
 
-def rectify(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='rectified.safetensors'):
+def collapse(model, collapse_ranges=None, do_rectify=False, do_quantize=False):
+    if collapse_ranges is None:
+        collapse_ranges = [(13,17)]
+    layers = model.model.layers
+    new_layers = []
+    teacher_to_student = [] 
+    start_to_range = {start: (start, end) for start, end in collapse_ranges}
+    indices_to_skip = set()
+    for start, end in collapse_ranges:
+        for i in range(start + 1, end):
+            indices_to_skip.add(i)
+    teacher_offset = 0
+    for i, layer in enumerate(layers):
+        student_idx = len(new_layers)
+        if i in start_to_range:
+            start, end = start_to_range[i]
+            n_rcr = end - start
+            teacher_to_student.append((teacher_offset+end - 1, student_idx))
+            ref_layer = layer
+            if hasattr(ref_layer.self_attn, 'to_retention') and do_rectify:
+                ref_layer.self_attn = ref_layer.self_attn.to_retention(model._config)
+            rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr)
+            new_layers.append(rec_block)
+        elif i in indices_to_skip:
+            continue
+        else:
+            if getattr(layer, 'n_rcr', None):
+                teacher_offset += (layer.n_rcr-1)
+            new_layers.append(layer)
+    model.model.layers = new_layers
+    model.teacher_to_student = teacher_to_student
+    if do_quantize:
+        nn.quantize(model, 32, 8, class_predicate=lambda p, m: (isinstance(m, nn.Linear) or isinstance(m, nn.Embedding)) and not p.endswith('_new'))
+    return model
+
+def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors', unfreeze_all=False):
+    teacher_to_student = getattr(model, "teacher_to_student", None)
+    student_indices = [s[1] for s in teacher_to_student] if teacher_to_student else []
+    print(f'{teacher_to_student=}')
     from mlx.utils import tree_unflatten
     model.freeze()
-    # # {{ unfreeze all
-    for l in model.model.layers:
-        if getattr(l, 'n_rcr', None):
-            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('g_proj_new') else None)
-    # # }} unfreeze all
+    def to_dora_(layer):
+        _rank = 64
+        return DoRALinear.from_linear(layer, r=_rank, alpha=_rank, scale=1.0, dropout=0.0)
+    for layer_idx, l in enumerate(model.model.layers):
+        if getattr(l, 'n_rcr', None) and (layer_idx in student_indices):
+            print(f'{layer_idx=}')
+            loralized = [(k, to_dora_(m)) for k, m in l.named_modules() if k.endswith('proj')]
+            l.update_modules(tree_unflatten(loralized))
+            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('_new') else None)
+    if unfreeze_all:
+        for l in model.model.layers:
+            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(('lora_a', 'lora_b')) else None)
+    print_trainable_parameters(model)
     from datasets import load_dataset
     ds = load_dataset(ds_id, split="test").to_list()
     ds = ds#[:200]
     ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
-    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=None)
+    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
     from mlx.utils import tree_flatten
-    # mx.save_safetensors(to, dict(tree_flatten(model.trainable_parameters())), metadata=None) # [] to save in metadata layers removed, replaced, n_rcr, etc
+    mx.save_safetensors(to, dict(tree_flatten(model.parameters())), metadata=None) # just to see how small; [] need quant params to load though
     mx.clear_cache()
     return model
