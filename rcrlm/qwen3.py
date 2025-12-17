@@ -36,7 +36,7 @@ class Retention(nn.Module):
         q = self.q_norm(q.reshape(B, L, self.n_heads, self.head_dim)).transpose(0, 2, 1, 3)
         k = self.k_norm(k.reshape(B, L, self.n_kv_heads, self.head_dim)).transpose(0, 2, 1, 3)
         v = v.reshape(B, L, self.n_kv_heads, self.head_dim).transpose(0, 2, 1, 3)
-        q, k = self.apply_rope(q, k, rope[0], rope[1], rot_dims=self.rot_dims)
+        # q, k = self.apply_rope(q, k, rope[0], rope[1], rot_dims=self.rot_dims)
         if self.n_repeat > 1:
             k = mx.repeat(k, self.n_repeat, axis=1)
             v = mx.repeat(v, self.n_repeat, axis=1)
@@ -63,16 +63,18 @@ class Retention(nn.Module):
         decay_vec = self._gamma[:, None] ** (L - 1 - mx.arange(L)[None, :])
         k_decayed = k * decay_vec[None, :, :, None]
         current_chunk_state = k_decayed.transpose(0, 1, 3, 2) @ v
-        
         if prev_state is not None:
             chunk_decay = self._gamma[:, None, None] ** L 
             final_state = (prev_state * chunk_decay) + current_chunk_state
+            decay_cross = self._gamma[:, None] ** (mx.arange(L) + 1)[None, :]
+            cross_h = (q * decay_cross[None, :, :, None]) @ prev_state
+            h = h + cross_h
         else:
             final_state = current_chunk_state
         return h, final_state
 
     def recurrent_retention(self, q, k, v, cache):
-        k = k * self.scale
+        q = q * self.scale
         gamma = self._gamma[None, :, None, None]
         ktv = k.transpose(0, 1, 3, 2) @ v
         s, n = cache.get_sn()
@@ -88,7 +90,7 @@ class Retention(nn.Module):
         diff = n - m
         gamma = self._gamma[:, None, None]
         D = (gamma ** diff) * mask
-        return D
+        return mx.stop_gradient(D)
 
 class Attention(nn.Module):
     def __init__(self, config, *, rcr_idx):

@@ -321,13 +321,13 @@ print(eval_str)
 〄 Testing vanilla decoding...
 ┌────────────────────────────── Streaming ──────────────────────────────┐
 <think>
-Okay, the user wants a story about Einstein. Let me start by recalling Einstein's life. He was a genius, a scientist, and a philosopher. I need to make sure the story includes his contributions to science, maybe his work on relativity, and his personal life. 
+Okay, the user wants a story about Einstein. Let me start by recalling Einstein's life. He was a genius, a scientist, and a philosopher. I need to make sure the story includes his contributions to science, maybe his work on relativity, and his personal life.
 
-First, I should set the scene. Maybe start with his early life in Germany, where he was born. Then introduce his family, his parents, maybe his mother's influence. Then his education, the famous lectures, and his breakthroughs. 
+First, I should set the scene. Maybe start with his early life in Germany, where he was born. Then introduce his family, his parents, maybe his mother's influence. Then his education, the famous lectures, and his breakthroughs.
 
-I need to highlight his scientific achievements, like the theory of relativity. Also, his personal struggles, like the time he spent in the Alps, the Alps being a place of isolation and inspiration. 
+I need to highlight his scientific achievements, like the theory of relativity. Also, his personal struggles, like the time he spent in the Alps, the Alps being a place of isolation and inspiration.
 
-I should include some quotes or references to his work. Maybe mention his quote about the universe being infinite. Also, his later years and how he passed away. 
+I should include some quotes or references to his work. Maybe mention his quote about the universe being infinite. Also, his later years and how he passed away.
 
 Wait, the user might want the story to be engaging and highlight his legacy. I need to make sure the story flows well, with a good narrative arc. Avoid clichés, but still capture his essence. Check for any inaccuracies, like his actual birth date and death year. Let me confirm: Einstein was born on April 14, 18
 └───────────────────────────────────────────────────────────────────────┘
@@ -339,19 +339,19 @@ Write a story about Einstein
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
 <think>
-Okay, the user wants a story about Einstein. Let me start by recalling Einstein's life. He was a genius, a scientist, and a philosopher. I need to make sure the story includes his contributions to science, maybe his work on relativity, and his personal life. 
+Okay, the user wants a story about Einstein. Let me start by recalling Einstein's life. He was a genius, a scientist, and a philosopher. I need to make sure the story includes his contributions to science, maybe his work on relativity, and his personal life.
 
-First, I should set the scene. Maybe start with his early life in Germany, where he was born. Then introduce his family, his parents, maybe his mother's influence. Then his education, the famous lectures, and his breakthroughs. 
+First, I should set the scene. Maybe start with his early life in Germany, where he was born. Then introduce his family, his parents, maybe his mother's influence. Then his education, the famous lectures, and his breakthroughs.
 
-I need to highlight his scientific achievements, like the theory of relativity. Also, his personal struggles, like the time he spent in the Alps, the Alps being a place of isolation and inspiration. 
+I need to highlight his scientific achievements, like the theory of relativity. Also, his personal struggles, like the time he spent in the Alps, the Alps being a place of isolation and inspiration.
 
-I should include some quotes or references to his work. Maybe mention his quote about the universe being infinite. Also, his later years and how he passed away. 
+I should include some quotes or references to his work. Maybe mention his quote about the universe being infinite. Also, his later years and how he passed away.
 
 Wait, the user might want the story to be engaging and highlight his legacy. I need to make sure the story flows well, with a good narrative arc. Avoid clichés, but still capture his essence. Check for any inaccuracies, like his actual birth date and death year. Let me confirm: Einstein was born on April 14, 18
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    249.1 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    196.4 tokens/sec (256 tokens in 1.3s)
+Prompt processing:    243.4 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    199.0 tokens/sec (256 tokens in 1.3s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing batch decoding...
 ┌────────────────────────────── Streaming ──────────────────────────────┐
@@ -390,7 +390,7 @@ Write a neurology ICU admission note.
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00002 ──────────────────────────────┐
 <think>
-Okay, I need to write a neurology ICU admission note. Let me start by recalling what an ICU admission note typically includes. It's a medical record that outlines the patient's condition, initial assessment, interventions, and any ongoing care. 
+Okay, I need to write a neurology ICU admission note. Let me start by recalling what an ICU admission note typically includes. It's a medical record that outlines the patient's condition, initial assessment, interventions, and any ongoing care.
 
 First, the patient's name and date of admission. I should make sure to include that. Then, the patient's name, age, gender, and primary diagnosis. Since it's a neurology ICU, the main issue is likely a neurological
 └───────────────────────────────────────────────────────────────────────┘
@@ -406,13 +406,15 @@ Okay, the user is asking for a comparison between the Sortino Ratio for Bitcoin 
 First, I need to check the historical data
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:   1018.8 tokens/sec ( 72 tokens in 0.1s)
-Tokens generation:    471.4 tokens/sec (400 tokens in 0.8s)
+Prompt processing:   1097.7 tokens/sec ( 72 tokens in 0.1s)
+Tokens generation:    471.9 tokens/sec (400 tokens in 0.8s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing DoRA training...
-epoch=    0 avg_loss=    0.26 elp_train=   11.80
+Epoch 1/2: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 50/50 [00:11<00:00,  4.30it/s, loss=0.106]
+epoch=    0 avg_loss=    0.27 elp_train=   11.62
 └ test output: ['<svg width="100" height="100" viewBox="-50 -5']
-epoch=    1 avg_loss=    0.04 elp_train=   11.79
+Epoch 2/2: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 50/50 [00:11<00:00,  4.26it/s, loss=0.075]
+epoch=    1 avg_loss=    0.04 elp_train=   11.74
 └ test output: ['<svg width="100" height="100" viewBox="-50 -5']
 〄 Testing DoRA decoding...
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
@@ -424,13 +426,13 @@ medium red circle<|im_end|>
 </think>
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="35" fill="#f6f465"/></svg><|im_end|>
+<svg width="100" height="100" viewBox="-50 -50 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="0" cy="0" r="35" fill="#f6f4f5"/></svg><|im_end|>
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    419.8 tokens/sec ( 15 tokens in 0.0s)
-Tokens generation:    154.4 tokens/sec (256 tokens in 1.7s)
+Prompt processing:    396.7 tokens/sec ( 15 tokens in 0.0s)
+Tokens generation:    155.0 tokens/sec (256 tokens in 1.7s)
 └───────────────────────────────────────────────────────────────────────┘
-〄 Testing collapse 0/3...
+〄 Testing collapse 0/1...
 ✓ Colapsed:
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
@@ -440,15 +442,19 @@ Write a story about Einstein
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
 </think>
-**The Story of Einstein: A Brief version**  
+**The Story of Einstein: A Brief version**
 *by: The story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    329.0 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    228.7 tokens/sec (100 tokens in 0.4s)
+Prompt processing:    278.5 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    233.9 tokens/sec (100 tokens in 0.4s)
 └───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.37 elp_train=   85.61
-└ test output: ["I'm sorry, I can't help with that request. Let me know if you'd like to"]
+teacher_to_student=[(16, 13)]
+layer_idx=13
+Trainable parameters: 0.265% (1.454M/548.857M)
+Epoch 1/1: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 327/327 [01:25<00:00,  3.82it/s, loss=2.298]
+epoch=    0 avg_loss=    2.43 elp_train=   85.50
+└ test output: ['I\'m sorry, I can\'t help with that request. The user is asking for a "medium']
 ✓ Healed:
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
@@ -458,46 +464,44 @@ Write a story about Einstein
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
 <think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, so I should focus on his life and achievements. Let me start with his early life. He was born in 1904 in Austria, where he studied mathematics and physics. His work in relativity and quantum mechanics are central. I should highlight his contributions and how they changed the world. Maybe include some key moments, like his discovery of the theory of relativity. I need to make sure the story flows well and includes his personal life and achievements. Let me structure it in a chronological order, starting with his early life, then his scientific contributions, and end with his legacy. I should also add some details about his personal life, like his family, his struggles, and his impact on the world. Let me make sure the story is engaging and highlights his achievements. I need to make sure the story is clear and flows well. Let me check if all the points are covered and if the details are accurate. I should avoid any technical jargon and keep it simple. Let me make sure the story is engaging and has a clear beginning, middle, and end. I think that's a good start for a story about Einstein.
+Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, so I should highlight his scientific achievements, maybe his impact on modern science. Let me start with his early life, his work, and his later contributions. Maybe include some historical context, like his time in the Alps, his work in the Alps, and his later contributions. I should make sure to include his scientific achievements and his impact on modern science. Let me structure the story in a chronological order. Start with his early life, then his work, and his later contributions. Maybe include some historical context, like his time in the Alps, his work in the Alps, and his later contributions. I need to make sure the story flows well and includes all the key points. Let me check if all the elements are covered: his scientific achievements, his impact on modern science, and his legacy. I should also make sure to include his personal life, maybe his family, his time in the Alps, and his later contributions. Let me make sure the story is engaging and includes all the key points. I think that's a solid start for a story about Einstein.
 </think>
 
-**Einstein's Journey**  
+**Einstein's Journey**
 
-In the quiet halls of the University of Zurich, young Einstein, born in 1904, would become a towering figure in the world of physics. His early life was marked by a curious mix of curiosity and determination. He was a prodigy, and his father, Max Planck, was a brilliant scientist who would later become the father of the theory of relativity.  
+In the quiet hills of the Swiss Alps, young Einstein, a curious and brilliant mind, embarked on a journey that would shape the course of modern science. Born in 1879, he would become a towering figure in the world of physics. His early life was marked by a mix of curiosity and determination. He spent his childhood in the Alps, where he was fascinated by the stars and the universe. His father, a scientist, encouraged him to pursue a career in physics, which he eventually chose. He spent his time in the Alps, where he studied mathematics and physics, and later became a professor at the University of Zurich. His work in the Alps would later lead to groundbreaking discoveries that would change the course of modern science.
 
-Einstein, a brilliant mind, was fascinated by the nature of space and time, and his work in physics would eventually lead to groundbreaking discoveries. He would later be awarded the Nobel Prize for his work in relativity and quantum mechanics. His story is a testament to his intellect and passion for science.  
+Einstein's journey was one of both inspiration and challenge. He faced many obstacles, including the cold winds of the Alps, the harsh weather, and the skepticism of his peers. He overcame these challenges by working tirelessly, and his work in the Alps became a symbol of perseverance and innovation. His scientific achievements in the 20th century revolutionized modern physics and laid the foundation for the field of quantum mechanics. His work in the 20th century also had a lasting impact on the scientific community.
 
-As he grew up, he faced challenges, including poverty and isolation, and his family was often overlooked. He was known for his ability to think critically and solve problems. His work in relativity and quantum mechanics revolutionized the scientific community.  
+Einstein's legacy is one of both brilliance and inspiration. He was known for his ability to combine mathematics with physics, and his work in the 20th century revolutionized the field of modern science. His contributions to physics and his impact on the scientific community have left a lasting mark on the world. Today, Einstein's name is remembered not only for his scientific achievements but for his personal life and contributions to the field of physics. His work continues to inspire scientists and future generations of physicists.
 
-Einstein's legacy is still remembered, and his name is synonymous with the greatest scientific achievement of humanity. His work in relativity and quantum mechanics has inspired generations of scientists and thinkers. His contributions have not only changed the world but have also influenced the future of science.  
-
-In the end, Einstein's story is a testament to his brilliance and dedication to science. He was a pioneer in the field of physics, and his work continues to inspire others.<|im_end|>
+**The End.**<|im_end|>
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    179.1 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:     98.5 tokens/sec (1024 tokens in 10.4s)
+Prompt processing:    135.4 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:     87.3 tokens/sec (1024 tokens in 11.7s)
 └───────────────────────────────────────────────────────────────────────┘
 [──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 919 candidates.
-   -> Subtracting 70% of rank 404 (Sim: 0.1917)
+   -> Found 914 candidates.
+   -> Subtracting 70% of rank 230 (Sim: 0.1787)
 [──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 988 candidates.
-   -> Subtracting 70% of rank 680 (Sim: 0.1605)
+   -> Found 985 candidates.
+   -> Subtracting 70% of rank 940 (Sim: 0.1614)
 [──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 984 candidates.
-   -> Subtracting 70% of rank 405 (Sim: 0.1500)
+   -> Found 987 candidates.
+   -> Subtracting 70% of rank 250 (Sim: 0.1434)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1013 candidates.
-   -> Subtracting 70% of rank 784 (Sim: 0.1601)
+   -> Found 1018 candidates.
+   -> Subtracting 70% of rank 717 (Sim: 0.1578)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 686 candidates.
-   -> Subtracting 70% of rank 141 (Sim: 0.2684)
+   -> Found 650 candidates.
+   -> Subtracting 70% of rank 420 (Sim: 0.2633)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 994 candidates.
-   -> Subtracting 70% of rank 345 (Sim: 0.1597)
+   -> Found 999 candidates.
+   -> Subtracting 70% of rank 356 (Sim: 0.1556)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 992 candidates.
-   -> Subtracting 70% of rank 445 (Sim: 0.1318)
+   -> Found 993 candidates.
+   -> Subtracting 70% of rank 276 (Sim: 0.1335)
 [──────────────────────────────] Successfully healed and merged 7 layers.
 ✓ Dampened:
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
@@ -508,239 +512,25 @@ Write a story about Einstein
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
 <think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, so I should focus on his life and achievements. Let me start with his early life. He was born in 1879 in Germany, where he was raised by his parents, Max Planck, and his mother, Elsa. He was a young boy, and he was known for his genius. I should highlight his scientific contributions, like the theory of relativity, and his impact on modern science. I need to include his personal life, his work, and his legacy. Let me structure the story in chronological order. Start with his early life, then his scientific achievements, and end with his legacy. Make sure to include his key moments, like the discovery of the theory of relativity, and his personal struggles. I should also add some details about his personal life, like his relationship with his mother, his struggles, and his later life. Let me make sure the story flows well and includes all the key points. I need to make sure the story is engaging and highlights Einstein's contributions. Let me check if all the points are covered and if the story is clear and engaging. I think that's a solid start for a story about Einstein.
-</think>
-
-**Einstein's Life**  
-
-In the quiet halls of the University of Zurich, young Max Planck, a devoted student, was raised by his parents, Max Planck, and his mother, Elsa. The family was modest, and Einstein was a curious and imaginative child. He was known for his ability to think creatively, and his father, a scientist, encouraged him to pursue a career in physics. The world was changing, and Einstein was already a prodigy.  
-
-Einstein was born in 1879 in Germany, where he was raised by his parents, Max Planck, and his mother, Elsa. He was a young boy, and his father, Max, was a respected scientist. The family was supportive, and Einstein was always curious. He spent his time with his parents, learning the basics of physics, and developing his talents.  
-
-Einstein's early life was marked by a mix of scientific curiosity and personal challenges. He was known for his ability to think creatively, and he often asked questions that led to groundbreaking discoveries. He was also known for his ability to solve complex problems, and his work in the field of physics made him a pioneer in modern science.  
-
-Einstein's work in the field of relativity, particularly the theory of special and general relativity, revolutionized modern science. He made a groundbreaking discovery that changed the understanding of space and time. His work laid the foundation for the development of modern physics.  
-
-Einstein's legacy is still recognized in the scientific community, and his work continues to influence the field of physics. He was a pioneer in the field of relativity, and his work remains a subject of study and admiration. His contributions to science are still recognized and celebrated.  
-
-Einstein's life was a testament to his genius and his ability to think creatively. He was a scientist who made significant contributions to the field of physics, and his work continues to influence the scientific community.<|im_end|>
+Okay, I need to write a story about Einstein. Let me think about the key elements. First, Einstein was a famous scientist, so I should highlight his personality, achievements, and maybe a moment that changed his life. Let's start with his early life. He was born in 1879 in Germany, where he studied physics and mathematics. His work led to the development of the theory of relativity and the equation E=mc². He was known for his mathematical genius and his ability to think creatively. Now, I need to include his personal life, maybe his struggles, and how he overcame them. Let's structure the story in chronological order: his early life, his breakthrough in physics, and his later achievements. Maybe include a moment that changed his life, like the E=mc² equation. Let's make sure to highlight his scientific contributions and the impact he had on the world. I should also add some elements that show his personality and how he overcame challenges. Maybe include a scene where he was working on a problem that led to a breakthrough. Let's make sure the story flows well and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a scene where he was working on a problem that led to a breakthrough. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with his early life, his breakthrough in physics, and his later achievements. Maybe include a moment where he overcame a challenge, like a difficult experiment or a personal struggle. Let's make sure the story is clear and includes all the key points. I need to make sure the story is engaging and highlights Einstein's personality and achievements. Let's start with
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    290.4 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    192.2 tokens/sec (1024 tokens in 5.3s)
-└───────────────────────────────────────────────────────────────────────┘
-〄 Testing collapse 1/3...
-✓ Colapsed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-</think>
-**The Story of Einstein: A Brief version**  
-*by: The story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    313.3 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    240.7 tokens/sec (100 tokens in 0.4s)
-└───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.44 elp_train=   84.45
-└ test output: ["I'm sorry! I can't help with that. Let me know if you'd like help with"]
-✓ Healed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, so I should focus on his life and achievements. Let me start with his early life. He was born in 1904 in Zurich, Germany. He was a genius, and his work in relativity and quantum mechanics made him a world-renowned figure. I should highlight his contributions to science and his impact on the scientific community. Maybe include some of his most famous works, like the theory of relativity and the equation E=mc². I should also touch on his personal life, like his relationship with his wife, his work on the atomic bomb, and his death. Let me make sure to include his achievements and the impact he had on science. I need to make it engaging and informative. Let me structure the story in a way that flows from his early life to his later achievements. I should mention his work on the atomic bomb and his death. Also, highlight his scientific contributions and the legacy he left behind. Let me make sure to include his personal life and the impact he had on the scientific community. I should also add some details about his work, like the equation E=mc², and his death. Let me make sure the story is engaging and informative. Alright, time to put it all together.
-</think>
-
-**Einstein's Legacy**  
-
-In the quiet halls of the Swiss Alps, Einstein’s mind was a beacon of brilliance. Born in 1904 in Zurich, Germany, he became a pioneer in physics, and his work in relativity and quantum mechanics revolutionized the scientific world. His life was marked by both brilliance and humility.  
-
-Einstein’s early life was shaped by the scientific curiosity that would define him. He was a prodigy, and his father, Albert Einstein, was a brilliant mathematician. He was known for his ability to think in abstract terms, and his work in relativity and quantum mechanics became a cornerstone of modern science. His father, a mathematician, often encouraged him to explore the mysteries of the universe.  
-
-Einstein’s work on the atomic bomb and the equation E=mc² laid the foundation for the scientific revolution. He was both a genius and a humble man, and his contributions to science have left a lasting mark on humanity.  
-
-In the years after his birth, Einstein became a celebrated figure in science, and his work continued to inspire generations. His legacy is still recognized and studied, and his name is remembered as one of the greatest minds in history.  
-
-Einstein’s life was a testament to his brilliance and his dedication to science. He was a man of curiosity, and his work continues to inspire scientists and future generations. His legacy endures, and his name is remembered as one of the greatest in history.<|im_end|>
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    175.0 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:     98.8 tokens/sec (1024 tokens in 10.4s)
-└───────────────────────────────────────────────────────────────────────┘
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 922 candidates.
-   -> Subtracting 70% of rank 581 (Sim: 0.1817)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 986 candidates.
-   -> Subtracting 70% of rank 701 (Sim: 0.1586)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 981 candidates.
-   -> Subtracting 70% of rank 591 (Sim: 0.1418)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1019 candidates.
-   -> Subtracting 70% of rank 777 (Sim: 0.1570)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 671 candidates.
-   -> Subtracting 70% of rank 271 (Sim: 0.2557)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 993 candidates.
-   -> Subtracting 70% of rank 336 (Sim: 0.1470)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 993 candidates.
-   -> Subtracting 70% of rank 270 (Sim: 0.1383)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-✓ Dampened:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, so I should focus on his life and achievements. Let me start with his early life. He was born in 1904 in Zurich, Germany, and he was known for his work in relativity and quantum mechanics. His story should highlight his contributions and the impact he had on science. I need to include his scientific achievements, his personality, and maybe a moment that defines his legacy. Let me structure the story in three parts: his early life, his scientific achievements, and his later life. Let me make sure to include his key moments, like the EPR paradox, the development of the theory of relativity, and his personal struggles. I should also add some details about his personality and how he influenced others. Let me make sure the story flows well and includes all the key points. Let me check if all the elements are covered and if the story is engaging. I think that's a solid start for a story about Einstein.
-</think>
-
-**Einstein's Legacy**  
-
-In the quiet halls of the Swiss Alps, Einstein’s name is etched in history. Born in 1904, he was a prodigious genius whose work in relativity and quantum mechanics revolutionized modern science. His story is a tale of brilliance, perseverance, and discovery.  
-
-**Early Life**  
-Einstein was born in Zurich, Germany, in 1904. His father, Albert Einstein, was a physicist who later became a Nobel Prize winner. He was known for his mathematical genius, and his work in relativity and quantum mechanics laid the foundation for modern science. His early years were marked by both scientific curiosity and a deep sense of purpose.  
-
-**Scientific Achievements**  
-Einstein’s groundbreaking work in relativity and quantum mechanics revolutionized modern physics. He formulated the theory of special and general relativity, which later became the basis for modern physics. His work in quantum mechanics and the development of the theory of relativity cemented his legacy.  
-
-**The EPR paradox**  
-In 1930, Einstein, Bohr, and others proposed a paradox that challenged the foundations of physics. This paradox, which later became a cornerstone of modern physics, demonstrated the non-local nature of quantum mechanics. Einstein and his colleagues were deeply unsettled by the implications of this work.  
-
-**Later Life**  
-Einstein’s legacy is still celebrated, and his work continues to influence science. He was awarded the Nobel Prize in Physics in 1921, and his theories have since been confirmed and expanded. His work in relativity and quantum mechanics has inspired generations of scientists and thinkers.  
-
-Einstein’s story is a testament to his brilliance and dedication to science. He was a pioneer in both theoretical and experimental physics, and his work continues to shape the world of science. His legacy endures, and his name remains synonymous with the greatest of all minds.<|im_end|>
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    304.0 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    213.1 tokens/sec (1024 tokens in 4.8s)
-└───────────────────────────────────────────────────────────────────────┘
-〄 Testing collapse 2/3...
-✓ Colapsed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-</think>
-**The Story of Einstein: A Brief version**  
-*by: The story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of the story of
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    310.6 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    239.7 tokens/sec (100 tokens in 0.4s)
-└───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.39 elp_train=   84.90
-└ test output: ["I'm sorry, I can't help with that request. Would you like a description of the red"]
-✓ Healed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein is a famous scientist, so I should highlight his contributions, like his theory of relativity, his work on the atomic bomb, and his impact on modern science. Maybe include some of his most famous quotes, like "Einstein's greatest achievement is the unification of the four fundamental forces." 
-
-Let me structure the story. Start with a simple, relatable scene. Maybe a quiet, peaceful morning at his home. Einstein is working on a new theory, and his colleagues are discussing the implications of his work. I should include some of his most famous quotes, like "Einstein's greatest achievement is the unification of the four fundamental forces." 
-
-I need to make it engaging and relatable. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet, peaceful place, like a garden or a quiet library. The atmosphere should be calm and peaceful. I should include some of his most famous quotes, like "Einstein's greatest achievement is the unification of the four fundamental forces." 
-
-I need to make sure the story flows well and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I should include some of his most famous quotes, like "Einstein's greatest achievement is the unification of the four fundamental forces." 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the flow. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could be a quiet garden, and he is surrounded by nature. The atmosphere should be peaceful and serene. 
-
-I need to make sure the story is engaging and includes the key points. Let me think about the structure. Maybe start with a quiet scene at his home, where he is working on a new theory. The setting could
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    173.8 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:     58.0 tokens/sec (1024 tokens in 17.6s)
-└───────────────────────────────────────────────────────────────────────┘
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 916 candidates.
-   -> Subtracting 70% of rank 208 (Sim: 0.1892)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 982 candidates.
-   -> Subtracting 70% of rank 877 (Sim: 0.1605)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 977 candidates.
-   -> Subtracting 70% of rank 365 (Sim: 0.1438)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1016 candidates.
-   -> Subtracting 70% of rank 769 (Sim: 0.1569)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 694 candidates.
-   -> Subtracting 70% of rank 229 (Sim: 0.2579)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 993 candidates.
-   -> Subtracting 70% of rank 216 (Sim: 0.1580)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 994 candidates.
-   -> Subtracting 70% of rank 449 (Sim: 0.1412)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-✓ Dampened:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein is a famous scientist, so I should focus on his life, his work, and maybe his impact. Let me start with his early life. He was born in 1904 in Austria, where he studied physics and mathematics. His work on the theory of relativity and the equation E=mc² are central to his legacy. I should highlight his contributions and how they changed the world. Maybe include some key moments, like his discovery of the equation, and his impact on science. I need to make sure the story flows well and includes his personal life and achievements. Let me structure it into sections: early life, achievements, and legacy. I should also add some details about his personal life, like his family, his struggles, and his impact on the world. Let me make sure the story is engaging and highlights his scientific contributions. I should avoid clichés and focus on the real aspects of his life. Let me check if the story is coherent and if it captures Einstein's essence. I think the story should be engaging and highlight his scientific achievements. Now, I need to make sure the story is clear and flows well. Let me think about the structure. Maybe start with his early life, then his achievements, and end with his legacy. I should include details about his personal life, like his family, his struggles, and his impact on the world. Let me make sure the story is concise and highlights his contributions. I think the story should be engaging and highlight his scientific achievements. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. Let me make sure the story is clear and flows well. I think the story should be about Einstein's life and his contributions to science. Let me make sure the story is engaging and highlights his achievements. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. Let me make sure the story is engaging and highlights his achievements. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to write the story in a way that makes it easy to read and that captures Einstein's essence. I think the story should be about Einstein's life and his contributions to science. Now, I need to
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    305.4 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    137.7 tokens/sec (1024 tokens in 7.4s)
+Prompt processing:    294.0 tokens/sec ( 14 tokens in 0.0s)
+Tokens generation:    134.8 tokens/sec (1024 tokens in 7.6s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing cascading...
-epoch=    0 avg_loss=    1.54 elp_train=   88.53
-└ test output: ["Here's the medium red circle:\n\n![](https://via.placeholder.com/600x4"]
+teacher_to_student=[(12, 9)]
+layer_idx=9
+Trainable parameters: 0.265% (1.454M/548.857M)
+Epoch 1/1: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 327/327 [01:30<00:00,  3.62it/s, loss=1.174]
+epoch=    0 avg_loss=    1.56 elp_train=   90.26
+└ test output: ["Here's the medium red circle:\n\n![](https://via.placeholder.com/600x6"]
 teacher_to_student=[(19, 13)]
 layer_idx=13
 Trainable parameters: 0.290% (1.454M/501.664M)
-epoch=    0 avg_loss=   10.00 elp_train=   87.35
-└ test output: ['The red circle is a circle that represents a circle in the center. The circle is a circle in']
+Epoch 1/1: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 327/327 [01:28<00:00,  3.69it/s, loss=8.250]
+epoch=    0 avg_loss=   10.01 elp_train=   88.64
+└ test output: ['The red circle is a red circle.<|im_end|>']
 ✓ Cascaded:
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
@@ -753,280 +543,56 @@ Write a story about Einstein
 <think>
 </think>
 
-**Title: Einstein: The Great Mind**
+**Einstein: The Great Mind**
 
-**Story: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**Title: Einstein: The Great Mind**
-
-**
+Einstein, the young man, was a brilliant scientist, and he is a great scientist. He is a man who is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a great scientist. He is a
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    151.1 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:     50.8 tokens/sec (1024 tokens in 20.2s)
+Prompt processing:    154.9 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:     50.7 tokens/sec (1024 tokens in 20.2s)
 └───────────────────────────────────────────────────────────────────────┘
 [──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 923 candidates.
-   -> Subtracting 70% of rank 320 (Sim: 0.1979)
+   -> Found 926 candidates.
+   -> Subtracting 70% of rank 429 (Sim: 0.2071)
 [──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 914 candidates.
-   -> Subtracting 70% of rank 470 (Sim: 0.2093)
+   -> Found 915 candidates.
+   -> Subtracting 70% of rank 462 (Sim: 0.2052)
 [──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 977 candidates.
-   -> Subtracting 70% of rank 213 (Sim: 0.1351)
+   -> Found 980 candidates.
+   -> Subtracting 70% of rank 424 (Sim: 0.1380)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
    -> Found 1023 candidates.
-   -> Subtracting 70% of rank 896 (Sim: 0.1704)
+   -> Subtracting 70% of rank 882 (Sim: 0.1674)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 798 candidates.
-   -> Subtracting 70% of rank 177 (Sim: 0.2008)
+   -> Found 789 candidates.
+   -> Subtracting 70% of rank 249 (Sim: 0.2244)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
    -> Found 1002 candidates.
-   -> Subtracting 70% of rank 374 (Sim: 0.1496)
+   -> Subtracting 70% of rank 449 (Sim: 0.1415)
 [──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 1008 candidates.
-   -> Subtracting 70% of rank 406 (Sim: 0.1235)
+   -> Found 1001 candidates.
+   -> Subtracting 70% of rank 388 (Sim: 0.1268)
 [──────────────────────────────] Processing model.layers.9.layer.mlp.up_proj...
-   -> Found 935 candidates.
-   -> Subtracting 70% of rank 241 (Sim: 0.1885)
+   -> Found 925 candidates.
+   -> Subtracting 70% of rank 278 (Sim: 0.1863)
 [──────────────────────────────] Processing model.layers.9.layer.mlp.down_proj...
-   -> Found 999 candidates.
-   -> Subtracting 70% of rank 873 (Sim: 0.1693)
+   -> Found 1003 candidates.
+   -> Subtracting 70% of rank 824 (Sim: 0.1623)
 [──────────────────────────────] Processing model.layers.9.layer.mlp.gate_proj...
-   -> Found 998 candidates.
-   -> Subtracting 70% of rank 479 (Sim: 0.1400)
+   -> Found 1004 candidates.
+   -> Subtracting 70% of rank 405 (Sim: 0.1461)
 [──────────────────────────────] Processing model.layers.9.layer.self_attn.o_proj...
-   -> Found 1002 candidates.
-   -> Subtracting 70% of rank 871 (Sim: 0.1635)
+   -> Found 1000 candidates.
+   -> Subtracting 70% of rank 830 (Sim: 0.1790)
 [──────────────────────────────] Processing model.layers.9.layer.self_attn.v_proj...
-   -> Found 824 candidates.
-   -> Subtracting 70% of rank 357 (Sim: 0.1903)
+   -> Found 833 candidates.
+   -> Subtracting 70% of rank 306 (Sim: 0.1880)
 [──────────────────────────────] Processing model.layers.9.layer.self_attn.k_proj...
-   -> Found 972 candidates.
-   -> Subtracting 70% of rank 179 (Sim: 0.1568)
+   -> Found 977 candidates.
+   -> Subtracting 70% of rank 350 (Sim: 0.1495)
 [──────────────────────────────] Processing model.layers.9.layer.self_attn.q_proj...
-   -> Found 1005 candidates.
-   -> Subtracting 70% of rank 354 (Sim: 0.1286)
+   -> Found 1004 candidates.
+   -> Subtracting 70% of rank 357 (Sim: 0.1302)
 [──────────────────────────────] Successfully healed and merged 14 layers.
 ✓ Dampened:
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
@@ -1040,526 +606,216 @@ Write a story about Einstein
 <think>
 </think>
 
-**Einstein: The Great Mind**
+**Einstein: The Great Light**
 
-**Title: "The Great Mind"**
+Einstein, the young man, lived in a small village nestled in the heart of the mountains, nestled in the hills, surrounded by the mountains, and the village. He lived in the mountains, and he is a great man.
 
-**Einstein: The Great Mind**
+He lived in the mountains, and he is a great man. He is a young man, and he is a great man. He is a young man, and he is a great man.
 
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**Einstein: The Great Mind**
-
-**
+He is a young man, and he is a great man. He is a young man, and he is a great man.<|im_end|>
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    284.3 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    139.4 tokens/sec (1024 tokens in 7.3s)
-└───────────────────────────────────────────────────────────────────────┘
-〄 Testing RetNet 0/3...
-✓ Colapsed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-</think>
-Okay, I need to write a story about Einstein, but yet, but I don't know... I need to make it work. But I don't know... I need to make it work. I can't write it... I don't know... I just need... I need... I can't write it... I don't know... I can't write it, I think I need to stop. but I don... I can't write it. but I don't know...
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    523.2 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    262.9 tokens/sec (100 tokens in 0.4s)
-└───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.49 elp_train=   82.00
-└ test output: ['Here is a medium red circle with a red border, styled in a simple, clean, and modern']
-✓ Healed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a genius, and he had a lot of things in his life. He was known for his work in physics, and he had a lot of things in his life. So, I need to focus on his life and his contributions. Let me outline the story: Einstein was born in 1879, lived in the US, and had a lot of things in his life. He was known for his work in physics, and he had a lot of things in his life. So, I need to include his achievements, his personality, and his impact on the world. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the key points. Einstein was born in 1879, lived in the US, and had a lot of things in his life. So, I need to include his achievements, his personality, and his impact on the world. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the key points. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key moments, like his discovery of the theory of relativity. Let me think about the structure. The story should start with his early life, his work, and his later contributions. Maybe include some of his key</think>
-<|im_start|>
-</think>
-
-**The Genius of Einstein**  
-
-Einstein, born in 1879, lived a life of intellectual brilliance. His work in physics, particularly the theory of relativity, revolutionized modern science. He was a polymath, combining mathematics, physics, and philosophy, and his ideas laid the foundation for the universe.  
-
-The story begins with a simple yet profound moment: Einstein, a young man with a curious mind, discovers a book that changes his life. He reads it, and he is immediately captivated by its depth. He is fascinated by the equations that describe the universe, and he begins to write down his thoughts. Over time, he becomes a renowned scientist, and his ideas eventually lead to the development of the theory of relativity.  
-
-In the end, Einstein is celebrated for his contributions to science, and his work continues to influence the world. He is remembered as one of the greatest minds in history.<|im_end|>
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    251.3 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    111.7 tokens/sec (1024 tokens in 9.2s)
-└───────────────────────────────────────────────────────────────────────┘
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 910 candidates.
-   -> Subtracting 70% of rank 512 (Sim: 0.1876)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 984 candidates.
-   -> Subtracting 70% of rank 862 (Sim: 0.1636)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 983 candidates.
-   -> Subtracting 70% of rank 322 (Sim: 0.1324)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1015 candidates.
-   -> Subtracting 70% of rank 852 (Sim: 0.1482)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 675 candidates.
-   -> Subtracting 70% of rank 404 (Sim: 0.2635)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 989 candidates.
-   -> Subtracting 70% of rank 346 (Sim: 0.1532)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 994 candidates.
-   -> Subtracting 70% of rank 333 (Sim: 0.1392)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-✓ Dampened:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a genius, and he had a lot of things in his life. He was known for his work in physics, and he had a lot of things in his life. So, how to start? Maybe start with his early life and his work. Let's see... Einstein was born in 1879, and he was a famous scientist. He had a lot of things in his life, and he had a lot of things in his life. So, maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his key moments, like his discovery of the theory of relativity. Then maybe add some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the structure. Maybe start with his early life, then his work, then his death. Then maybe add some details about his personal life, like his family, his struggles, and his legacy. So, the story should have a beginning, middle, and end. Let me think about the elements. Einstein was a genius, and he had a lot of things in his life. So, maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his key moments, like his discovery of the theory of relativity. Then maybe add some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his family and his achievements. Maybe include some of his personal life, like his struggles and his death. So, the story should have a beginning, middle, and end. Let me think about the elements. Maybe start with his early life and his work. Then maybe add some details about his</think>
-
-**Einstein's Life**  
-
-Einstein was born in 1879, and he was a genius. He was known for his work in physics, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a genius, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He was a scientist, and he had a lot of things in his life. He
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    281.1 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    129.9 tokens/sec (1024 tokens in 7.9s)
-└───────────────────────────────────────────────────────────────────────┘
-〄 Testing RetNet 1/3...
-✓ Colapsed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-</think>
-
-* laugh smile, looks at the universe, and then looks at the universe, and then the universe is the universe. The universe is the universe. The universe is the universe. The universe is the universe. The universe is the universe. The universe is the universe. The universe is the space and time of the universe. The universe is the universe. A lot of things are in the universe. But the universe is the same before everything. The universe is the same before everything. and
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    507.8 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    260.9 tokens/sec (100 tokens in 0.4s)
-└───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.46 elp_train=   83.24
-└ test output: ["Here's a **medium red circle** (with a red color) that you can use in your"]
-✓ Healed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let's start with some basic facts. Einstein was a famous physicist, born in 1879 in Germany, and he was known for his work in relativity and quantum mechanics. He was a genius, and his work in relativity and quantum mechanics has had a lasting impact on modern science. Now, I need to create a story that tells the story of Einstein. Let me think about the key points. Einstein was born in 1879, lived in the 20th century, and his work in relativity and quantum mechanics has had a lasting impact. The story should include his early life, his education, and his contributions to science. I need to make sure to highlight his achievements and the impact of his work. Let me outline the story. The story should start with his early life, his education, and his contributions to science. The story should include his work in relativity and quantum mechanics. The story should highlight his achievements and the impact of his work. The story should include his contributions to science and his legacy. The story should include his work in relativity and quantum mechanics. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story</think>
-</think>
-
-**"Einstein's Legacy"**
-
-In the story, Einstein was born in 1879, and his early life was marked by a mix of brilliance and struggle. He was the son of a famous physicist, Max Planck, who later became the head of the University of Zurich. Einstein was known for his genius, and his work in relativity and quantum mechanics has had a lasting impact on modern science. He was a prodigy, and his work in relativity and quantum mechanics has had a lasting impact on science. His contributions to science have been profound, and his legacy is still recognized today. He was a genius, and his work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has had a lasting impact on science. His work in relativity and quantum mechanics has
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    235.1 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    112.4 tokens/sec (1024 tokens in 9.1s)
-└───────────────────────────────────────────────────────────────────────┘
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 918 candidates.
-   -> Subtracting 70% of rank 546 (Sim: 0.1789)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 982 candidates.
-   -> Subtracting 70% of rank 744 (Sim: 0.1660)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 981 candidates.
-   -> Subtracting 70% of rank 296 (Sim: 0.1472)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1017 candidates.
-   -> Subtracting 70% of rank 829 (Sim: 0.1469)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 656 candidates.
-   -> Subtracting 70% of rank 271 (Sim: 0.2637)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 1000 candidates.
-   -> Subtracting 70% of rank 280 (Sim: 0.1585)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 997 candidates.
-   -> Subtracting 70% of rank 372 (Sim: 0.1392)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-✓ Dampened:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let's start with some basic facts. Einstein was a famous physicist, born in 1879 in Germany, and he was known for his work in relativity and quantum mechanics. He was a genius, and his work in relativity and quantum mechanics has had a lasting impact on modern science. Now, I need to create a story that tells the story of Einstein. Let me think about the key points. Einstein was born in 1879, lived in the 20th century, and his work in relativity and quantum mechanics has had a lasting impact. The story should include his early life, his education, and his contributions to science. I need to make sure to highlight his achievements and the impact of his work. Let me outline the story. The story should start with his early life, his education, and his contributions to science. The story should include his work in relativity and quantum mechanics. The story should highlight his achievements and the impact of his work. The story should include his contributions to science and his legacy. The story should include his work in relativity and quantum mechanics. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story should include his contributions to science and his legacy. The story</think>
-</think>
-
-**"Einstein's Legacy"**
-
-In the early 20th century, Einstein was born in 1879, a man of genius and intellect, and his work in relativity and quantum mechanics has left an indelible mark on science. He was a prodigy who, at the age of 25, made groundbreaking discoveries that changed the course of modern physics. His work in relativity and quantum mechanics has had a lasting impact on science, and his legacy continues to inspire scientists and thinkers around the world.
-
-The story begins with a simple yet touching scene: Einstein, a young boy, is playing with his father, his mother, and his friends. He is excited about the new discoveries he has made, and he is eager to share his knowledge with others. He is determined to explore the mysteries of the universe, and his work has inspired many scientists to pursue this path.
-
-As he plays, he is fascinated by the idea of time and space, and he is determined to explore the mysteries of the universe. He is determined to make a difference in the world, and he believes that his work will change the world. His work has inspired many scientists to pursue this path, and his legacy continues to influence the scientific community
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    254.5 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    131.3 tokens/sec (1024 tokens in 7.8s)
-└───────────────────────────────────────────────────────────────────────┘
-〄 Testing RetNet 2/3...
-✓ Colapsed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-</think>
-* chuckling* * smiling*.
-
-"Ah! I'm just as old as I was before, just but and I'm just as old as I Could Be, but I'm not, but I'm not, but I'm not, but I'm, but I'm, and I'm, and I. But what is this, the universe? It's not, but it's, but it's not yet,, but it's, but it's, but it's
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    519.3 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    265.2 tokens/sec (100 tokens in 0.4s)
-└───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=    2.53 elp_train=   83.01
-└ test output: ["I'm sorry, I can't help with that. Let me know if you'd like any help"]
-✓ Healed:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous scientist, and he was known for his work in relativity and quantum mechanics. The story should highlight his contributions and achievements. Let me start by setting the scene. Einstein was born in 1879 in Germany, where he studied physics and mathematics. He made groundbreaking contributions to the field of relativity, and his work has become a cornerstone of modern science. The story should highlight his life and achievements, and maybe his impact on the world. I need to include his personal life, his work, and his legacy. Let me make sure to include his key points about relativity and his contributions. The story should be engaging and informative. Let me structure the story with a beginning, middle, and end, and end with a meaningful message. I should make sure to include his key points about relativity and his contributions. The story should be about Einstein's life and his impact on the world. Let me make sure to include his key points about relativity and his contributions. The story should be engaging and informative. Alright, I think I have a good idea for the story. Let me write it out and make sure to include all the key points about Einstein's life and achievements.
-</think>
-
-**Einstein's Life**  
-
-Einstein, born in 1879, was a towering figure in the world of physics. His work in relativity revolutionized our understanding of space and time, and his ideas laid the foundation for modern science. He was a genius, and his contributions to the field have become a cornerstone of human knowledge.  
-
-Einstein's story began in the early 20th century, where he was fascinated by the theory of relativity. He spent his childhood in the countryside of Germany, where he studied mathematics and physics. His work in relativity led to groundbreaking discoveries that changed the course of modern science. His ideas on time dilation and the speed of light became the basis of the theory, and his work continues to influence our understanding of the universe.  
-
-Einstein's legacy is marked by his ability to combine mathematics with physics, and his contributions have shaped the world. He was known for his ability to think abstractly and to combine his knowledge of both mathematics and physics. His work in relativity and quantum mechanics has become a subject of study and admiration.  
-
-In the end, Einstein's life was a testament to his genius and his ability to think creatively. His work in relativity and quantum mechanics has become a subject of study and admiration. His legacy continues to influence the world.<|im_end|>
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    247.0 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    192.4 tokens/sec (1024 tokens in 5.3s)
-└───────────────────────────────────────────────────────────────────────┘
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 920 candidates.
-   -> Subtracting 70% of rank 547 (Sim: 0.1872)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 984 candidates.
-   -> Subtracting 70% of rank 574 (Sim: 0.1631)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 982 candidates.
-   -> Subtracting 70% of rank 338 (Sim: 0.1452)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1019 candidates.
-   -> Subtracting 70% of rank 833 (Sim: 0.1533)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 668 candidates.
-   -> Subtracting 70% of rank 287 (Sim: 0.2629)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 998 candidates.
-   -> Subtracting 70% of rank 420 (Sim: 0.1597)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 995 candidates.
-   -> Subtracting 70% of rank 414 (Sim: 0.1337)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-✓ Dampened:
-┌────────────────────────────── Inp 00000 ──────────────────────────────┐
-<|im_start|>user
-Write a story about Einstein
-<|im_end|>
-<|im_start|>assistant
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Out 00000 ──────────────────────────────┐
-<think>
-Okay, I need to write a story about Einstein. Let me think about the key elements. Einstein was a famous physicist, and he was known for his work in relativity and quantum mechanics. The story should highlight his contributions and achievements. Let me start by setting the scene. Einstein was born in 1879 in Germany, where he studied mathematics and physics. He made groundbreaking contributions to the field of relativity. The story should show his journey from a young man to a renowned scientist, with his work influencing the world. I need to include his personal life and achievements. Let me make sure to highlight his scientific achievements and his impact on the world. The story should be engaging and informative. Let me structure the story with a beginning, middle, and end. The story should show Einstein's journey from a young man to a renowned scientist, and his contributions to the field. I need to include his personal life and achievements. The story should be written in a simple and engaging way. Let me make sure to include his scientific achievements and his impact on the world. The story should be about Einstein's life and his contributions to science. Let me make sure to highlight his work and his impact. The story should be written in a simple and engaging way. Alright, I think I have a good idea for the story. Let me start with his early life, his education, and his contributions to science. Then, I can show his journey from a young man to a renowned scientist. The story should be written in a simple and engaging way. Let me make sure to include his scientific achievements and his impact on the world. The story should be written in a simple and engaging way. Alright, I think I have a good idea for the story. Let me write it out.
-</think>
-
-**Einstein's Journey**  
-
-Einstein was born in 1879 in Germany, where he studied mathematics and physics. He was a brilliant young scientist, and his work in relativity revolutionized modern physics. His early life was marked by intense curiosity and a passion for science. He studied mathematics and physics, and his work in relativity laid the foundation for the theory of general relativity. His contributions to the field of physics were groundbreaking. He made significant advancements in the understanding of time and space, and his work has influenced the world today. Einstein's journey from a young man to a renowned scientist is a testament to his intellect and dedication. His work in relativity and quantum mechanics has left a lasting mark on the scientific community.  
-
-**The End.**<|im_end|>
-└───────────────────────────────────────────────────────────────────────┘
-┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    260.0 tokens/sec ( 14 tokens in 0.1s)
-Tokens generation:    226.6 tokens/sec (1024 tokens in 4.5s)
+Prompt processing:    273.3 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:   1093.5 tokens/sec (1024 tokens in 0.9s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing drink...
+Analyzing Effective Ranks: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 196/196 [01:32<00:00,  2.12it/s]
+   0.mlp.up_proj                            | EffR:  969.1 | k: 1024 -> 614
+   0.mlp.down_proj                          | EffR:  968.3 | k: 1024 -> 613
+   0.mlp.gate_proj                          | EffR:  942.1 | k: 1024 -> 597
+   0.self_attn.o_proj                       | EffR:  981.5 | k: 1024 -> 622
+   Skipping 0.self_attn.v_proj: Compress (1179648) > Org (1048576)
+   0.self_attn.k_proj                       | EffR:  766.1 | k: 1024 -> 436
+   0.self_attn.q_proj                       | EffR:  901.7 | k: 1024 -> 513
+   1.mlp.up_proj                            | EffR:  963.8 | k: 1024 -> 610
+   1.mlp.down_proj                          | EffR:  958.6 | k: 1024 -> 607
+   1.mlp.gate_proj                          | EffR:  951.8 | k: 1024 -> 603
+   1.self_attn.o_proj                       | EffR:  881.5 | k: 1024 -> 558
+   Skipping 1.self_attn.v_proj: Compress (1140736) > Org (1048576)
+   1.self_attn.k_proj                       | EffR:  751.9 | k: 1024 -> 428
+   1.self_attn.q_proj                       | EffR:  864.8 | k: 1024 -> 493
+   2.mlp.up_proj                            | EffR:  961.2 | k: 1024 -> 609
+   2.mlp.down_proj                          | EffR:  958.6 | k: 1024 -> 607
+   2.mlp.gate_proj                          | EffR:  944.3 | k: 1024 -> 598
+   2.self_attn.o_proj                       | EffR:  883.2 | k: 1024 -> 559
+   Skipping 2.self_attn.v_proj: Compress (1114112) > Org (1048576)
+   2.self_attn.k_proj                       | EffR:  732.7 | k: 1024 -> 417
+   2.self_attn.q_proj                       | EffR:  849.0 | k: 1024 -> 484
+   3.mlp.up_proj                            | EffR:  963.3 | k: 1024 -> 610
+   3.mlp.down_proj                          | EffR:  954.1 | k: 1024 -> 604
+   3.mlp.gate_proj                          | EffR:  951.0 | k: 1024 -> 602
+   3.self_attn.o_proj                       | EffR:  890.7 | k: 1024 -> 564
+   Skipping 3.self_attn.v_proj: Compress (1140736) > Org (1048576)
+   3.self_attn.k_proj                       | EffR:  738.3 | k: 1024 -> 421
+   3.self_attn.q_proj                       | EffR:  865.6 | k: 1024 -> 493
+   4.mlp.up_proj                            | EffR:  960.8 | k: 1024 -> 609
+   4.mlp.down_proj                          | EffR:  951.9 | k: 1024 -> 603
+   4.mlp.gate_proj                          | EffR:  944.7 | k: 1024 -> 598
+   4.self_attn.o_proj                       | EffR:  910.3 | k: 1024 -> 577
+   Skipping 4.self_attn.v_proj: Compress (1159168) > Org (1048576)
+   4.self_attn.k_proj                       | EffR:  752.0 | k: 1024 -> 428
+   4.self_attn.q_proj                       | EffR:  886.4 | k: 1024 -> 504
+   5.mlp.up_proj                            | EffR:  957.3 | k: 1024 -> 606
+   5.mlp.down_proj                          | EffR:  953.1 | k: 1024 -> 604
+   5.mlp.gate_proj                          | EffR:  943.2 | k: 1024 -> 597
+   5.self_attn.o_proj                       | EffR:  927.2 | k: 1024 -> 587
+   Skipping 5.self_attn.v_proj: Compress (1157120) > Org (1048576)
+   5.self_attn.k_proj                       | EffR:  753.0 | k: 1024 -> 429
+   5.self_attn.q_proj                       | EffR:  874.0 | k: 1024 -> 498
+   6.mlp.up_proj                            | EffR:  956.8 | k: 1024 -> 606
+   6.mlp.down_proj                          | EffR:  937.1 | k: 1024 -> 594
+   6.mlp.gate_proj                          | EffR:  942.0 | k: 1024 -> 597
+   6.self_attn.o_proj                       | EffR:  899.2 | k: 1024 -> 570
+   Skipping 6.self_attn.v_proj: Compress (1132544) > Org (1048576)
+   6.self_attn.k_proj                       | EffR:  695.3 | k: 1024 -> 396
+   6.self_attn.q_proj                       | EffR:  822.8 | k: 1024 -> 468
+   7.mlp.up_proj                            | EffR:  953.0 | k: 1024 -> 604
+   7.mlp.down_proj                          | EffR:  934.4 | k: 1024 -> 592
+   7.mlp.gate_proj                          | EffR:  933.7 | k: 1024 -> 591
+   7.self_attn.o_proj                       | EffR:  892.8 | k: 1024 -> 566
+   Skipping 7.self_attn.v_proj: Compress (1150976) > Org (1048576)
+   7.self_attn.k_proj                       | EffR:  746.9 | k: 1024 -> 425
+   7.self_attn.q_proj                       | EffR:  867.9 | k: 1024 -> 495
+   8.mlp.up_proj                            | EffR:  952.6 | k: 1024 -> 603
+   8.mlp.down_proj                          | EffR:  927.9 | k: 1024 -> 588
+   8.mlp.gate_proj                          | EffR:  934.2 | k: 1024 -> 592
+   8.self_attn.o_proj                       | EffR:  881.7 | k: 1024 -> 558
+   Skipping 8.self_attn.v_proj: Compress (1107968) > Org (1048576)
+   8.self_attn.k_proj                       | EffR:  717.0 | k: 1024 -> 408
+   8.self_attn.q_proj                       | EffR:  845.4 | k: 1024 -> 481
+   9.mlp.up_proj                            | EffR:  948.5 | k: 1024 -> 601
+   9.mlp.down_proj                          | EffR:  928.2 | k: 1024 -> 588
+   9.mlp.gate_proj                          | EffR:  924.3 | k: 1024 -> 585
+   9.self_attn.o_proj                       | EffR:  884.8 | k: 1024 -> 560
+   Skipping 9.self_attn.v_proj: Compress (1130496) > Org (1048576)
+   9.self_attn.k_proj                       | EffR:  730.0 | k: 1024 -> 415
+   9.self_attn.q_proj                       | EffR:  852.1 | k: 1024 -> 486
+   10.mlp.up_proj                           | EffR:  946.8 | k: 1024 -> 600
+   10.mlp.down_proj                         | EffR:  935.6 | k: 1024 -> 593
+   10.mlp.gate_proj                         | EffR:  922.4 | k: 1024 -> 584
+   10.self_attn.o_proj                      | EffR:  887.5 | k: 1024 -> 562
+   Skipping 10.self_attn.v_proj: Compress (1126400) > Org (1048576)
+   10.self_attn.k_proj                      | EffR:  733.5 | k: 1024 -> 418
+   10.self_attn.q_proj                      | EffR:  860.4 | k: 1024 -> 490
+   11.mlp.up_proj                           | EffR:  944.7 | k: 1024 -> 598
+   11.mlp.down_proj                         | EffR:  922.4 | k: 1024 -> 584
+   11.mlp.gate_proj                         | EffR:  925.2 | k: 1024 -> 586
+   11.self_attn.o_proj                      | EffR:  882.6 | k: 1024 -> 559
+   Skipping 11.self_attn.v_proj: Compress (1093632) > Org (1048576)
+   11.self_attn.k_proj                      | EffR:  694.4 | k: 1024 -> 396
+   11.self_attn.q_proj                      | EffR:  799.1 | k: 1024 -> 455
+   12.mlp.up_proj                           | EffR:  945.2 | k: 1024 -> 599
+   12.mlp.down_proj                         | EffR:  915.7 | k: 1024 -> 580
+   12.mlp.gate_proj                         | EffR:  922.7 | k: 1024 -> 584
+   12.self_attn.o_proj                      | EffR:  857.9 | k: 1024 -> 543
+   Skipping 12.self_attn.v_proj: Compress (1050624) > Org (1048576)
+   12.self_attn.k_proj                      | EffR:  701.9 | k: 1024 -> 399
+   12.self_attn.q_proj                      | EffR:  832.8 | k: 1024 -> 474
+   13.mlp.up_proj                           | EffR:  938.5 | k: 1024 -> 594
+   13.mlp.down_proj                         | EffR:  909.3 | k: 1024 -> 576
+   13.mlp.gate_proj                         | EffR:  915.3 | k: 1024 -> 580
+   13.self_attn.o_proj                      | EffR:  851.4 | k: 1024 -> 539
+   Skipping 13.self_attn.v_proj: Compress (1073152) > Org (1048576)
+   13.self_attn.k_proj                      | EffR:  689.4 | k: 1024 -> 393
+   13.self_attn.q_proj                      | EffR:  795.3 | k: 1024 -> 453
+   14.mlp.up_proj                           | EffR:  937.1 | k: 1024 -> 594
+   14.mlp.down_proj                         | EffR:  910.0 | k: 1024 -> 576
+   14.mlp.gate_proj                         | EffR:  913.1 | k: 1024 -> 578
+   14.self_attn.o_proj                      | EffR:  860.5 | k: 1024 -> 545
+   Skipping 14.self_attn.v_proj: Compress (1069056) > Org (1048576)
+   14.self_attn.k_proj                      | EffR:  688.4 | k: 1024 -> 392
+   14.self_attn.q_proj                      | EffR:  815.4 | k: 1024 -> 464
+   15.mlp.up_proj                           | EffR:  938.1 | k: 1024 -> 594
+   15.mlp.down_proj                         | EffR:  906.6 | k: 1024 -> 574
+   15.mlp.gate_proj                         | EffR:  914.4 | k: 1024 -> 579
+   15.self_attn.o_proj                      | EffR:  847.7 | k: 1024 -> 537
+   Skipping 15.self_attn.v_proj: Compress (1093632) > Org (1048576)
+   15.self_attn.k_proj                      | EffR:  701.3 | k: 1024 -> 399
+   15.self_attn.q_proj                      | EffR:  800.7 | k: 1024 -> 456
+   16.mlp.up_proj                           | EffR:  944.1 | k: 1024 -> 598
+   16.mlp.down_proj                         | EffR:  939.9 | k: 1024 -> 595
+   16.mlp.gate_proj                         | EffR:  916.5 | k: 1024 -> 581
+   16.self_attn.o_proj                      | EffR:  854.8 | k: 1024 -> 541
+   Skipping 16.self_attn.v_proj: Compress (1087488) > Org (1048576)
+   16.self_attn.k_proj                      | EffR:  677.4 | k: 1024 -> 386
+   16.self_attn.q_proj                      | EffR:  767.8 | k: 1024 -> 437
+   17.mlp.up_proj                           | EffR:  935.9 | k: 1024 -> 593
+   17.mlp.down_proj                         | EffR:  932.1 | k: 1024 -> 590
+   17.mlp.gate_proj                         | EffR:  921.4 | k: 1024 -> 584
+   17.self_attn.o_proj                      | EffR:  847.2 | k: 1024 -> 537
+   Skipping 17.self_attn.v_proj: Compress (1077248) > Org (1048576)
+   17.self_attn.k_proj                      | EffR:  687.7 | k: 1024 -> 392
+   17.self_attn.q_proj                      | EffR:  777.3 | k: 1024 -> 442
+   18.mlp.up_proj                           | EffR:  940.3 | k: 1024 -> 596
+   18.mlp.down_proj                         | EffR:  933.0 | k: 1024 -> 591
+   18.mlp.gate_proj                         | EffR:  925.9 | k: 1024 -> 587
+   18.self_attn.o_proj                      | EffR:  868.0 | k: 1024 -> 550
+   Skipping 18.self_attn.v_proj: Compress (1097728) > Org (1048576)
+   18.self_attn.k_proj                      | EffR:  699.8 | k: 1024 -> 398
+   18.self_attn.q_proj                      | EffR:  786.6 | k: 1024 -> 448
+   19.mlp.up_proj                           | EffR:  939.2 | k: 1024 -> 595
+   19.mlp.down_proj                         | EffR:  931.4 | k: 1024 -> 590
+   19.mlp.gate_proj                         | EffR:  922.6 | k: 1024 -> 584
+   19.self_attn.o_proj                      | EffR:  855.2 | k: 1024 -> 542
+   Skipping 19.self_attn.v_proj: Compress (1081344) > Org (1048576)
+   19.self_attn.k_proj                      | EffR:  699.9 | k: 1024 -> 398
+   19.self_attn.q_proj                      | EffR:  774.9 | k: 1024 -> 441
+   20.mlp.up_proj                           | EffR:  932.2 | k: 1024 -> 591
+   20.mlp.down_proj                         | EffR:  929.7 | k: 1024 -> 589
+   20.mlp.gate_proj                         | EffR:  925.3 | k: 1024 -> 586
+   20.self_attn.o_proj                      | EffR:  890.2 | k: 1024 -> 564
+   Skipping 20.self_attn.v_proj: Compress (1069056) > Org (1048576)
+   20.self_attn.k_proj                      | EffR:  710.9 | k: 1024 -> 405
+   20.self_attn.q_proj                      | EffR:  784.0 | k: 1024 -> 447
+   21.mlp.up_proj                           | EffR:  934.4 | k: 1024 -> 592
+   21.mlp.down_proj                         | EffR:  938.0 | k: 1024 -> 594
+   21.mlp.gate_proj                         | EffR:  926.7 | k: 1024 -> 587
+   21.self_attn.o_proj                      | EffR:  860.2 | k: 1024 -> 545
+   21.self_attn.v_proj                      | EffR:  725.4 | k: 1024 -> 504
+   21.self_attn.k_proj                      | EffR:  677.5 | k: 1024 -> 386
+   21.self_attn.q_proj                      | EffR:  792.9 | k: 1024 -> 451
+   22.mlp.up_proj                           | EffR:  941.4 | k: 1024 -> 596
+   22.mlp.down_proj                         | EffR:  931.2 | k: 1024 -> 590
+   22.mlp.gate_proj                         | EffR:  933.9 | k: 1024 -> 592
+   22.self_attn.o_proj                      | EffR:  897.6 | k: 1024 -> 569
+   Skipping 22.self_attn.v_proj: Compress (1085440) > Org (1048576)
+   22.self_attn.k_proj                      | EffR:  702.8 | k: 1024 -> 400
+   22.self_attn.q_proj                      | EffR:  821.2 | k: 1024 -> 468
+   23.mlp.up_proj                           | EffR:  944.0 | k: 1024 -> 598
+   23.mlp.down_proj                         | EffR:  923.3 | k: 1024 -> 585
+   23.mlp.gate_proj                         | EffR:  937.2 | k: 1024 -> 594
+   23.self_attn.o_proj                      | EffR:  914.3 | k: 1024 -> 579
+   Skipping 23.self_attn.v_proj: Compress (1097728) > Org (1048576)
+   23.self_attn.k_proj                      | EffR:  732.1 | k: 1024 -> 417
+   23.self_attn.q_proj                      | EffR:  842.2 | k: 1024 -> 479
+   24.mlp.up_proj                           | EffR:  947.5 | k: 1024 -> 600
+   24.mlp.down_proj                         | EffR:  926.8 | k: 1024 -> 587
+   24.mlp.gate_proj                         | EffR:  942.5 | k: 1024 -> 597
+   24.self_attn.o_proj                      | EffR:  903.2 | k: 1024 -> 572
+   Skipping 24.self_attn.v_proj: Compress (1052672) > Org (1048576)
+   24.self_attn.k_proj                      | EffR:  689.2 | k: 1024 -> 392
+   24.self_attn.q_proj                      | EffR:  802.9 | k: 1024 -> 458
+   25.mlp.up_proj                           | EffR:  947.6 | k: 1024 -> 600
+   25.mlp.down_proj                         | EffR:  941.1 | k: 1024 -> 596
+   25.mlp.gate_proj                         | EffR:  942.8 | k: 1024 -> 597
+   25.self_attn.o_proj                      | EffR:  903.6 | k: 1024 -> 572
+   25.self_attn.v_proj                      | EffR:  732.4 | k: 1024 -> 510
+   25.self_attn.k_proj                      | EffR:  681.4 | k: 1024 -> 388
+   25.self_attn.q_proj                      | EffR:  785.8 | k: 1024 -> 448
+   26.mlp.up_proj                           | EffR:  950.1 | k: 1024 -> 602
+   26.mlp.down_proj                         | EffR:  956.9 | k: 1024 -> 606
+   26.mlp.gate_proj                         | EffR:  939.3 | k: 1024 -> 595
+   26.self_attn.o_proj                      | EffR:  891.1 | k: 1024 -> 564
+   26.self_attn.v_proj                      | EffR:  731.6 | k: 1024 -> 509
+   26.self_attn.k_proj                      | EffR:  687.7 | k: 1024 -> 391
+   26.self_attn.q_proj                      | EffR:  801.9 | k: 1024 -> 457
+   27.mlp.up_proj                           | EffR:  942.2 | k: 1024 -> 597
+   27.mlp.down_proj                         | EffR:  964.0 | k: 1024 -> 611
+   27.mlp.gate_proj                         | EffR:  928.5 | k: 1024 -> 588
+   27.self_attn.o_proj                      | EffR:  931.4 | k: 1024 -> 590
+   Skipping 27.self_attn.v_proj: Compress (1163264) > Org (1048576)
+   27.self_attn.k_proj                      | EffR:  782.0 | k: 1024 -> 445
+   27.self_attn.q_proj                      | EffR:  895.9 | k: 1024 -> 510
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
 Write a story about Einstein
@@ -1567,35 +823,17 @@ Write a story about Einstein
 <|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-ย��яем�����จร�จรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรจรелелелел|;
-елел감감ทาง|;
-|;
-greSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQLgreSQL'";
-ExecutorgreSQL'";
-greSQL'";
-greSQL'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
-'";
+จรจรจรจรจรจรจรจรจรéricaéricaจรจรจรจรจรจรจรจรจรจรadersadersadersadersadersadersaders chooser createSelectoradersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersadersoooooooooo════════════════════════════════════════════════════════
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    345.8 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    206.3 tokens/sec (100 tokens in 0.5s)
+Prompt processing:    165.5 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    112.7 tokens/sec (100 tokens in 0.9s)
 └───────────────────────────────────────────────────────────────────────┘
-epoch=    0 avg_loss=31358.19 elp_train=  125.49
-└ test output: [' lальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальныйальный']
+teacher_to_student=[(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10), (11, 11), (12, 12), (13, 13), (14, 14), (15, 15), (16, 16), (17, 17), (18, 18), (19, 19), (20, 20), (21, 21), (22, 22), (23, 23), (24, 24), (25, 25), (26, 26), (27, 27)]
+Trainable parameters: 63.753% (319.867M/501.729M)
+Epoch 1/1: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 327/327 [02:21<00:00,  2.31it/s, loss=12329.751]
+epoch=    0 avg_loss=27838.65 elp_train=  141.43
+└ test output: ['，\n\n(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s']
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
 Write a story about Einstein
@@ -1603,13 +841,51 @@ Write a story about Einstein
 <|im_start|>assistant
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Out 00000 ──────────────────────────────┐
-$__ simplified simplified simplified underst....................................s------ between- to--------------****.................................................................. ........................ under... under... under... under... under... under... under... under... under... under**... under... under... under
+**
+
+ all
+
+
+ **
+ **
+ **
+ **   ** the
+ **
+
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+...
+... the the the to the the to the the to to all the the the to the the the the the to the the the the the the the the the the the the
+...
+
+ **
+ **
+ **
+ **
+ **
+ **
+ **
+ **
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    516.8 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    205.5 tokens/sec (100 tokens in 0.5s)
+Prompt processing:    143.0 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    110.7 tokens/sec (100 tokens in 0.9s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing pruning...
+Calibrating MLP: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 64/64 [00:03<00:00, 16.77it/s]
    Layer 0 pruned to 2150/3072
 ┌────────────────────────────── Inp 00000 ──────────────────────────────┐
 <|im_start|>user
@@ -1636,359 +912,665 @@ Okay, I need to write a story about Einstein. Let me think about how to approach
 **The story of Einstein**
 └───────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── Benchmark ──────────────────────────────┐
-Prompt processing:    343.3 tokens/sec ( 14 tokens in 0.0s)
-Tokens generation:    142.3 tokens/sec (1024 tokens in 7.2s)
+Prompt processing:    223.5 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:    142.6 tokens/sec (1024 tokens in 7.2s)
+└───────────────────────────────────────────────────────────────────────┘
+〄 Testing deacon...
+┌────────────────────────────── Streaming ──────────────────────────────┐
+.
+grolyngro她说gro固固gro固ngrogrogrogrogrogrogronnn<<<<<<<<<<<<<<<<<< < < < < < < < <<s <<<<<<<<<<<<<<<<<<<<<<<< < < <<<<<<<<<<<<<<<<<<<<< <<<<<<<<<<<<<<<<<<<<<< < < < < < < < < < < < < < < < < <  < < < < <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Inp 00000 ──────────────────────────────┐
+<|im_start|>user
+Write a story about Einstein
+<|im_end|>
+<|im_start|>assistant
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+.
+grolyngro她说gro固固gro固ngrogrogrogrogrogrogronnn<<<<<<<<<<<<<<<<<< < < < < < < < <<s <<<<<<<<<<<<<<<<<<<<<<<< < < <<<<<<<<<<<<<<<<<<<<< <<<<<<<<<<<<<<<<<<<<<< < < < < < < < < < < < < < < < < <  < < < < <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < < <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Benchmark ──────────────────────────────┐
+Prompt processing:    177.5 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:     74.0 tokens/sec (256 tokens in 3.5s)
+└───────────────────────────────────────────────────────────────────────┘
+teacher_to_student=None
+Trainable parameters: 6.343% (40.370M/636.420M)
+Epoch 1/1: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 327/327 [02:02<00:00,  2.67it/s, loss=5.074]
+epoch=    0 avg_loss=    7.02 elp_train=  122.63
+└ test output: ['**,,,,,,,,,,,,,,,,,,,']
+✓ Healed:
+┌────────────────────────────── Inp 00000 ──────────────────────────────┐
+<|im_start|>user
+Write a story about Einstein
+<|im_end|>
+<|im_start|>assistant
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+
+<think>
+<think>
+
+<think>
+
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+<think>
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Benchmark ──────────────────────────────┐
+Prompt processing:    173.4 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:     54.2 tokens/sec (1024 tokens in 18.9s)
+└───────────────────────────────────────────────────────────────────────┘
+〄 Testing tie...
+Collecting Activations: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 64/64 [00:03<00:00, 19.99it/s]
+[──────────────────────────────] Compressing using Vertical Stacking (Input Basis Sharing)...
+   -> Group 0: Rank=64, Targets=['self_attn.v_proj'], Layers=[10, 11, 12, 13, 14]
+      -> Group 0: ASVD scaling applied.
+      -> Compressed 5 layers in Group 0 to rank 64.
+[──────────────────────────────] Tie Complete. Replaced 5 modules.
+┌────────────────────────────── Streaming ──────────────────────────────┐
+<think>
+Okay, the user asked me to write a story about Einstein, but I need to make sure I do it properly. Let me start by thinking about the key points. The user might be looking for a story that includes Einstein's life, his work, and maybe some personal elements. I should make sure to cover his early life, his work, and his later years. Also, since the user might be interested in a story, I need to include some elements that make the story engaging. Let me structure the story to highlight his achievements and personal life. I should make sure to cover his early life, his work, and his later years. Also, since the user might be interested in a story, I need to include some elements that make the story engaging. Let me start by outlining the story, making sure to cover his early life, his work, and his later years. I need to make sure the story is engaging and includes his achievements and personal life. Let me start by writing the story, making sure to cover his early life, his work, and his later years. I need to make sure the story is engaging and includes his achievements and personal life. Alright, I think I have a good outline. Let me start writing the story now.
+
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Inp 00000 ──────────────────────────────┐
+<|im_start|>user
+Write a story about Einstein
+<|im_end|>
+<|im_start|>assistant
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Out 00000 ──────────────────────────────┐
+<think>
+Okay, the user asked me to write a story about Einstein, but I need to make sure I do it properly. Let me start by thinking about the key points. The user might be looking for a story that includes Einstein's life, his work, and maybe some personal elements. I should make sure to cover his early life, his work, and his later years. Also, since the user might be interested in a story, I need to include some elements that make the story engaging. Let me structure the story to highlight his achievements and personal life. I should make sure to cover his early life, his work, and his later years. Also, since the user might be interested in a story, I need to include some elements that make the story engaging. Let me start by outlining the story, making sure to cover his early life, his work, and his later years. I need to make sure the story is engaging and includes his achievements and personal life. Let me start by writing the story, making sure to cover his early life, his work, and his later years. I need to make sure the story is engaging and includes his achievements and personal life. Alright, I think I have a good outline. Let me start writing the story now.
+└───────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────── Benchmark ──────────────────────────────┐
+Prompt processing:    152.0 tokens/sec ( 14 tokens in 0.1s)
+Tokens generation:     79.0 tokens/sec (256 tokens in 3.2s)
 └───────────────────────────────────────────────────────────────────────┘
 〄 Testing lm-eval...
-{{{
+Starting lm-evaluation-harness on: ['mmlu', 'gpqa_main_n_shot', 'gsm8k', 'mgsm_direct_zh']
 
-- GPQA                :  0.20
-- GSM8k               :  0.40
-- MGSM                :  0.60
-- MMLU                :  0.44
+- GPQA                :  0.25
+- GSM8k               :  0.45
+- MGSM                :  0.55
+- MMLU                :  0.42
 |                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
 |---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
-|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|                                       |       |none             |     0|acc_norm   |↑  |0.2000|±  |0.2000|
-|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.4000|±  |0.2449|
-|                                       |       |strict-match     |     5|exact_match|↑  |0.2000|±  |0.2000|
-|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.6000|±  |0.2449|
+|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.2500|±  |0.0993|
+|                                       |       |none             |     0|acc_norm   |↑  |0.2500|±  |0.0993|
+|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.4500|±  |0.1141|
+|                                       |       |strict-match     |     5|exact_match|↑  |0.2500|±  |0.0993|
+|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.5500|±  |0.1141|
 |                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
-|mmlu                                   |      2|none             |      |acc        |↑  |0.4386|±  |0.0297|
-| - humanities                          |      2|none             |      |acc        |↑  |0.4000|±  |0.0625|
-|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - international_law                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - philosophy                         |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - prehistory                         |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - professional_law                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - world_religions                    |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-| - other                               |      2|none             |      |acc        |↑  |0.4462|±  |0.0634|
-|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - global_facts                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - human_aging                        |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - management                         |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - marketing                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - nutrition                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - virology                           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - social sciences                     |      2|none             |      |acc        |↑  |0.5000|±  |0.0645|
-|  - econometrics                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - public_relations                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - security_studies                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - sociology                          |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-| - stem                                |      2|none             |      |acc        |↑  |0.4211|±  |0.0505|
-|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - anatomy                            |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - astronomy                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - college_biology                    |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_physics                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - computer_security                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
+|mmlu                                   |      2|none             |      |acc        |↑  |0.4193|±  |0.0145|
+| - humanities                          |      2|none             |      |acc        |↑  |0.4385|±  |0.0310|
+|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - international_law                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2500|±  |0.0993|
+|  - philosophy                         |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - prehistory                         |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+|  - professional_law                   |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - world_religions                    |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+| - other                               |      2|none             |      |acc        |↑  |0.4077|±  |0.0299|
+|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.2500|±  |0.0993|
+|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - global_facts                       |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - human_aging                        |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+|  - management                         |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+|  - marketing                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.1124|
+|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.1124|
+|  - nutrition                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.1124|
+|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.1000|±  |0.0688|
+|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - virology                           |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+| - social sciences                     |      2|none             |      |acc        |↑  |0.4292|±  |0.0309|
+|  - econometrics                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.0918|
+|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.2000|±  |0.0918|
+|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.6000|±  |0.1124|
+|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - public_relations                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.0918|
+|  - security_studies                   |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - sociology                          |      1|none             |     0|acc        |↑  |0.7000|±  |0.1051|
+|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.6500|±  |0.1094|
+| - stem                                |      2|none             |      |acc        |↑  |0.4079|±  |0.0251|
+|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - anatomy                            |      1|none             |     0|acc        |↑  |0.4000|±  |0.1124|
+|  - astronomy                          |      1|none             |     0|acc        |↑  |0.6000|±  |0.1124|
+|  - college_biology                    |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
+|  - college_physics                    |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - computer_security                  |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.4500|±  |0.1141|
+|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.5000|±  |0.1147|
+|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.5500|±  |0.1141|
+|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2500|±  |0.0993|
+|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.3000|±  |0.1051|
+|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.0918|
+|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.3500|±  |0.1094|
 
-- GPQA                :  0.40
-- GSM8k               :  0.20
-- MGSM                :  0.00
-- MMLU                :  0.24
-|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
-|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
-|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|                                       |       |none             |     0|acc_norm   |↑  |0.4000|±  |0.2449|
-|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.2000|±  |0.2000|
-|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
-|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.0000|±  |0.0000|
-|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
-|mmlu                                   |      2|none             |      |acc        |↑  |0.2386|±  |0.0238|
-| - humanities                          |      2|none             |      |acc        |↑  |0.1692|±  |0.0421|
-|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - international_law                  |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - philosophy                         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - prehistory                         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_law                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - world_religions                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-| - other                               |      2|none             |      |acc        |↑  |0.2462|±  |0.0533|
-|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - global_facts                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - human_aging                        |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - management                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - marketing                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - nutrition                          |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - virology                           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - social sciences                     |      2|none             |      |acc        |↑  |0.2667|±  |0.0527|
-|  - econometrics                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - public_relations                   |      1|none             |     0|acc        |↑  |1.0000|±  |0.0000|
-|  - security_studies                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - sociology                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-| - stem                                |      2|none             |      |acc        |↑  |0.2632|±  |0.0428|
-|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - anatomy                            |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - astronomy                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_biology                    |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_physics                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - computer_security                  |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-
-epoch=    0 avg_loss=    2.38 elp_train=   85.17
-└ test output: ['I\'m sorry, I can\'t help with that request. The user asked for a "medium red']
-
-- GPQA                :  0.40
-- GSM8k               :  0.20
-- MGSM                :  0.20
-- MMLU                :  0.31
-|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
-|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
-|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|                                       |       |none             |     0|acc_norm   |↑  |0.4000|±  |0.2449|
-|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.2000|±  |0.2000|
-|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
-|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.2000|
-|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
-|mmlu                                   |      2|none             |      |acc        |↑  |0.3123|±  |0.0273|
-| - humanities                          |      2|none             |      |acc        |↑  |0.3846|±  |0.0634|
-|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - international_law                  |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - philosophy                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - prehistory                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - professional_law                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - world_religions                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-| - other                               |      2|none             |      |acc        |↑  |0.3077|±  |0.0544|
-|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - global_facts                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - human_aging                        |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - management                         |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - marketing                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - nutrition                          |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - virology                           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - social sciences                     |      2|none             |      |acc        |↑  |0.2667|±  |0.0540|
-|  - econometrics                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - public_relations                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - security_studies                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - sociology                          |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - stem                                |      2|none             |      |acc        |↑  |0.2947|±  |0.0477|
-|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - anatomy                            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - astronomy                          |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_biology                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_physics                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - computer_security                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-
-[──────────────────────────────] Processing model.layers.13.layer.mlp.up_proj...
-   -> Found 912 candidates.
-   -> Subtracting 70% of rank 467 (Sim: 0.1884)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.down_proj...
-   -> Found 986 candidates.
-   -> Subtracting 70% of rank 872 (Sim: 0.1618)
-[──────────────────────────────] Processing model.layers.13.layer.mlp.gate_proj...
-   -> Found 978 candidates.
-   -> Subtracting 70% of rank 249 (Sim: 0.1467)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.o_proj...
-   -> Found 1014 candidates.
-   -> Subtracting 70% of rank 626 (Sim: 0.1600)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.v_proj...
-   -> Found 680 candidates.
-   -> Subtracting 70% of rank 272 (Sim: 0.2712)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.k_proj...
-   -> Found 990 candidates.
-   -> Subtracting 70% of rank 290 (Sim: 0.1600)
-[──────────────────────────────] Processing model.layers.13.layer.self_attn.q_proj...
-   -> Found 995 candidates.
-   -> Subtracting 70% of rank 251 (Sim: 0.1431)
-[──────────────────────────────] Successfully healed and merged 7 layers.
-
-- GPQA                :  0.40
-- GSM8k               :  0.00
-- MGSM                :  0.20
-- MMLU                :  0.32
-|                 Tasks                 |Version|     Filter      |n-shot|  Metric   |   |Value |   |Stderr|
-|---------------------------------------|------:|-----------------|-----:|-----------|---|-----:|---|-----:|
-|gpqa_main_n_shot                       |      2|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|                                       |       |none             |     0|acc_norm   |↑  |0.4000|±  |0.2449|
-|gsm8k                                  |      3|flexible-extract |     5|exact_match|↑  |0.0000|±  |0.0000|
-|                                       |       |strict-match     |     5|exact_match|↑  |0.0000|±  |0.0000|
-|mgsm_direct_zh                         |      3|flexible-extract |     0|exact_match|↑  |0.2000|±  |0.2000|
-|                                       |       |remove_whitespace|     0|exact_match|↑  |0.0000|±  |0.0000|
-|mmlu                                   |      2|none             |      |acc        |↑  |0.3228|±  |0.0272|
-| - humanities                          |      2|none             |      |acc        |↑  |0.4000|±  |0.0634|
-|  - formal_logic                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_european_history       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - high_school_us_history             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_world_history          |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - international_law                  |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - jurisprudence                      |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - logical_fallacies                  |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - moral_disputes                     |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - moral_scenarios                    |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - philosophy                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - prehistory                         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - professional_law                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - world_religions                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-| - other                               |      2|none             |      |acc        |↑  |0.3077|±  |0.0544|
-|  - business_ethics                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - clinical_knowledge                 |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_medicine                   |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - global_facts                       |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - human_aging                        |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - management                         |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - marketing                          |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - medical_genetics                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - miscellaneous                      |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - nutrition                          |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - professional_accounting            |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_medicine              |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - virology                           |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - social sciences                     |      2|none             |      |acc        |↑  |0.2667|±  |0.0540|
-|  - econometrics                       |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_geography              |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_government_and_politics|      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_macroeconomics         |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_microeconomics         |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - high_school_psychology             |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - human_sexuality                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - professional_psychology            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - public_relations                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - security_studies                   |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - sociology                          |      1|none             |     0|acc        |↑  |0.8000|±  |0.2000|
-|  - us_foreign_policy                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-| - stem                                |      2|none             |      |acc        |↑  |0.3158|±  |0.0471|
-|  - abstract_algebra                   |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - anatomy                            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - astronomy                          |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_biology                    |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - college_chemistry                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_computer_science           |      1|none             |     0|acc        |↑  |0.6000|±  |0.2449|
-|  - college_mathematics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - college_physics                    |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - computer_security                  |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - conceptual_physics                 |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - electrical_engineering             |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - elementary_mathematics             |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_biology                |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_chemistry              |      1|none             |     0|acc        |↑  |1.0000|±  |0.0000|
-|  - high_school_computer_science       |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-|  - high_school_mathematics            |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_physics                |      1|none             |     0|acc        |↑  |0.2000|±  |0.2000|
-|  - high_school_statistics             |      1|none             |     0|acc        |↑  |0.0000|±  |0.0000|
-|  - machine_learning                   |      1|none             |     0|acc        |↑  |0.4000|±  |0.2449|
-
-}}}
-✓ Original:
-- GPQA                :  0.20
-- GSM8k               :  0.40
-- MGSM                :  0.60
-- MMLU                :  0.44
-✓ Collapsed:
-- GPQA                :  0.40
-- GSM8k               :  0.20
-- MGSM                :  0.00
-- MMLU                :  0.24
-✓ Healed:
-- GPQA                :  0.40
-- GSM8k               :  0.20
-- MGSM                :  0.20
-- MMLU                :  0.31
-✓ Dampened:
-- GPQA                :  0.40
-- GSM8k               :  0.00
-- MGSM                :  0.20
-- MMLU                :  0.32
-
+Starting lm-evaluation-harness on: ['mmlu', 'gpqa_main_n_shot', 'gsm8k', 'mgsm_direct_zh']
 ```
 </pre></details><br>

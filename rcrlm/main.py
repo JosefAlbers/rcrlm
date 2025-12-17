@@ -1,10 +1,11 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train, collapse, distill, cascade, dampen, prune, drink
+from .utils import load_model, load_config, download_repo, infer, train, collapse, distill, cascade, dampen, prune, drink, tie, deacon, fish
 from .qwen3 import Qwen3ForCausalLM
+from .tamo import TAMOQwen3, TamoConfig
 
 ARCHS = dict(Qwen3ForCausalLM=Qwen3ForCausalLM,)
 
-def test(task='all', num_repeat=3):
+def test(task='all', num_repeat=1):
     if task == 'infer' or task == 'all':
         m = load()
         print('〄 Testing vanilla decoding...')
@@ -30,7 +31,7 @@ def test(task='all', num_repeat=3):
         for _test_collapse_idx in range(num_repeat):
             print(f'〄 Testing collapse {_test_collapse_idx}/{num_repeat}...')
             m = load()
-            m['model'] = collapse(m['model'])
+            m['model'] = collapse(m['model'])#, do_rectify=True, do_quantize=True)
             print('✓ Colapsed:')
             _ = infer("Write a story about Einstein\n", **m, stream=False)
             teacher = load()['model']
@@ -52,21 +53,6 @@ def test(task='all', num_repeat=3):
         m['model'] = dampen(m['model'])
         print('✓ Dampened:')
         _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024, limit_thinking=True)
-    if task == 'rectify' or task == 'all':
-        for _test_rectify_idx in range(num_repeat):
-            print(f'〄 Testing RetNet {_test_rectify_idx}/{num_repeat}...')
-            m = load()
-            m['model'] = collapse(m['model'], do_rectify=True, do_quantize=True)
-            print('✓ Colapsed:')
-            _ = infer("Write a story about Einstein\n", **m, stream=False)
-            teacher = load()['model']
-            m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
-            print('✓ Healed:')
-            _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024, limit_thinking=True)
-            m['model'] = dampen(m['model'])
-            print('✓ Dampened:')
-            _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024, limit_thinking=True)
-            del teacher, m
     if task == 'drink' or task == 'all':
         print('〄 Testing drink...')
         m = load()
@@ -82,7 +68,36 @@ def test(task='all', num_repeat=3):
         m['model'] = prune("HuggingFaceH4/instruction-dataset", **m)
         _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024, limit_thinking=True)
         del m
+    if task == 'deacon' or task == 'all':
+        m = load()
+        print('〄 Testing deacon...')
+        m['model'] = deacon(**m)
+        _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)#, chat_template_kwargs=dict(enable_thinking=False))
+        teacher = load()['model']
+        m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher, add_dora=False)
+        print('✓ Healed:')
+        _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=1024)
+        del m, teacher
+    if task == 'tie' or task == 'all':
+        m = load()
+        print('〄 Testing tie...')
+        m['model'] = tie(**m)
+        _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)#, chat_template_kwargs=dict(enable_thinking=False))
+        del m
+    if task == 'tamo':# or task == 'all':
+        print('〄 Testing tamo...')
+        m = load()
+        model_tamo = TAMOQwen3(m['config'])
+        model_tamo.llm = m['model']
+        del m, model_tamo
+    if task == 'fish':# or task == 'all':
+        m = load()
+        print('〄 Testing fish...')
+        m['model'] = fish(**m, calib_ds_id="HuggingFaceH4/instruction-dataset")
+        _ = infer("Write a story about Einstein\n", **m, max_new_tokens=256)#, chat_template_kwargs=dict(enable_thinking=False))
+        del m
     if task == 'eval' or task == 'all':
+        eval_limit=20
         try:
             print('〄 Testing lm-eval...')
             print('{{{')
@@ -90,14 +105,14 @@ def test(task='all', num_repeat=3):
             eval_str = ''
             from .evals import eval_lm
             m = load()
-            eval_str += f'✓ Original:\n{eval_lm(**m)}\n'
+            eval_str += f'✓ Original:\n{eval_lm(**m, limit=eval_limit)}\n'
             m['model'] = collapse(m['model'])
-            eval_str += f'✓ Collapsed:\n{eval_lm(**m)}\n'
+            eval_str += f'✓ Collapsed:\n{eval_lm(**m, limit=eval_limit)}\n'
             teacher = load()['model']
             m['model'] = distill("HuggingFaceH4/instruction-dataset", **m, teacher=teacher)
-            eval_str += f'✓ Healed:\n{eval_lm(**m)}\n'
+            eval_str += f'✓ Healed:\n{eval_lm(**m, limit=eval_limit)}\n'
             m['model'] = dampen(m['model'])
-            eval_str += f'✓ Dampened:\n{eval_lm(**m)}\n'
+            eval_str += f'✓ Dampened:\n{eval_lm(**m, limit=eval_limit)}\n'
             print('}}}')
             print(eval_str)
             del teacher, m
@@ -106,6 +121,7 @@ def test(task='all', num_repeat=3):
             print('[ERROR] Need to pip install lm-eval first')
 
 def load(model_id='Qwen/Qwen3-0.6B', extra_config=None):
+# def load(model_id='Qwen/Qwen3-4B-Instruct-2507', extra_config=None):
     repo_name, model_name = model_id.split('/')
     model_path = download_repo(repo_name, model_name)
     model_cfg = load_config(model_path)

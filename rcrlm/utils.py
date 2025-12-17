@@ -16,6 +16,7 @@ from pathlib import Path
 
 import mlx.core as mx
 import mlx.nn as nn
+import numpy as np
 
 PRETTY_HW = '─'*30
 
@@ -187,7 +188,7 @@ def measure_performance(start_time, prompt_time, end_time, batch_size, seq_lengt
         print(f'└{PRETTY_HW*2}───────────┘')
     return metrics
 # }}} === PREP ===
-# {{{ === I_UTILS ===
+# {{{ === UTIL ===
 @mx.compile
 def update_cache(max_len, cache_k, cache_v, new_k, new_v):
     seq_len = new_k.shape[2]
@@ -204,10 +205,6 @@ class RollCacher(nn.Module):
         self.dtype=dtype
 
     def __call__(self, k, v):
-        # self.k = self_k = mx.concatenate([self.k, k], axis=2)[:, :, -self.max_len:, :]
-        # self.v = self_v = mx.concatenate([self.v, v], axis=2)[:, :, -self.max_len:, :]
-        # self.k = self_k = mx.concatenate([self.k[:, :, k.shape[2]:, :], k], axis=2)
-        # self.v = self_v = mx.concatenate([self.v[:, :, v.shape[2]:, :], v], axis=2)
         self.k, self.v = self_k, self_v = update_cache(self.max_len, self.k, self.v, k, v)
         return self_k, self_v
 
@@ -258,12 +255,7 @@ class Roper(nn.Module):
         self.dtype=config.dtype
 
     def __call__(self, positions):
-        # positions = positions[:, None, :, None]
-        # angles = positions * self.freq
-        # cos = mx.cos(angles) * self.su_scale
-        # sin = mx.sin(angles) * self.su_scale
         cos, sin = get_rope(positions, self.freq, self.su_scale)
-        # return cos.astype(self.dtype), sin.astype(self.dtype)
         return mx.stop_gradient(cos.astype(self.dtype)), mx.stop_gradient(sin.astype(self.dtype))
 
     def _llama3(self, config):
@@ -394,9 +386,8 @@ def create_causal_mask(padding_mask):
     seq_length = padding_mask.shape[1]
     causal_matrix = mx.tril(mx.ones((seq_length, seq_length), dtype=mx.bool_))
     causal_mask = causal_matrix & padding_mask[:, None, :]
-    # causal_mask = mx.where(causal_matrix & padding_mask[:, None, :], 0.0, -1e9) # additive
     return causal_mask[:, None, :, :]
-# }}} === I_UTILS ===
+# }}} === UTIL ===
 # {{{ === INFER ===
 def infer(
     prompts,
@@ -490,7 +481,7 @@ def infer(
         new_goon = prev_goon & (~is_eos)
         next_position_ids = prev_position_ids[:, -1:] + 1
         new_carry = (next_input_ids, next_position_ids, new_mask, new_goon)
-        return new_carry#, next_input_ids
+        return new_carry
     if use_jit:
         scan_fn = mx.compile(scan_step, inputs=cache, outputs=cache)
     else:
@@ -501,26 +492,18 @@ def infer(
     nbuf=eval_every//2
     ntok=1
     start_tic = time.perf_counter()
-    # carry, _oid = scan_step(carry)
     carry = scan_step(carry)
     mx.eval(carry)
     output_ids = [carry[0]]
     prompt_tic = time.perf_counter()
     for i in range(max_new_tokens-1):
         carry = scan_fn(carry)
-        # carry, _oid = scan_fn(carry)
-        # {{ limit thinking
         if end_think_id is not None and i == int(0.75*max_new_tokens):
             cat_oids = mx.concat(output_ids, axis=1)
             is_done = mx.any(cat_oids == end_think_id, axis=-1, keepdims=True)
-            # print(f'{tokenizer.decode(cat_oids[-1].tolist())=}')
-            # print(f'{is_done=}')
             _carry_0 = carry[0]
             _carry_0 = mx.where(is_done, _carry_0, end_think_id)
-            # print(f'{_carry_0=}')
             carry = tuple([_carry_0, *carry[1:]])
-            # print(f'{carry=}')
-        # }} limit thinking
         output_ids.append(carry[0])
         ntok+=1
         if i % eval_every == eval_every-1:
@@ -548,6 +531,443 @@ def infer(
         _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
     return dict(inp_str=input_str, inp_ids=input_ids, out_str=output_str, out_ids=output_ids)
 # }}} === INFER ===
+# {{{ === MISC ===
+def show_tie_1(model, collapse_cfg=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    targets, k_rank = collapse_cfg['targets'], collapse_cfg['rank']
+    layers = model.model.layers
+    Ws = []
+    layer_names = []
+    layer_boundaries = [0]
+    for i, l in enumerate(layers):
+        for name, m in l.named_modules():
+            if name in targets:
+                if isinstance(m, nn.QuantizedLinear):
+                    w = mx.dequantize(m.weight, m.scales, m.biases, m.group_size, m.bits)
+                else:
+                    w = m.weight
+                Ws.append(w)
+                layer_names.append(f"L{i}")
+                layer_boundaries.append(layer_boundaries[-1] + w.shape[0])
+    W_tall = mx.concatenate(Ws, axis=0)
+    d_out_layer = Ws[0].shape[0]
+    W_np = np.array(W_tall.astype(mx.float32))
+    U, S, Vt = np.linalg.svd(W_np, full_matrices=False)
+    k_calc = min(k_rank, len(S))
+    U_k = U[:, :k_calc]
+    S_k = S[:k_calc]
+    E_matrix = (U_k * S_k[None, :]) ** 2
+    heatmap_rows = []
+    stats = []
+    for idx in range(len(layer_names)):
+        start = layer_boundaries[idx]
+        end = layer_boundaries[idx+1]
+        layer_energy = np.sum(E_matrix[start:end, :], axis=0) # Shape (k,)
+        total_e = np.sum(layer_energy)
+        pdf = layer_energy / (total_e + 1e-9)
+        cdf = np.cumsum(pdf)
+        heatmap_rows.append(pdf)
+        peak_idx = np.argmax(pdf)
+        ranks = np.arange(k_calc)
+        mean_idx = np.sum(ranks * pdf)
+        p05 = np.argmax(cdf >= 0.05)
+        p25 = np.argmax(cdf >= 0.25)
+        p50 = np.argmax(cdf >= 0.50) # Median
+        p75 = np.argmax(cdf >= 0.75)
+        p95 = np.argmax(cdf >= 0.95)
+        stats.append({
+            'mean': mean_idx,
+            'peak': peak_idx,
+            'p05': p05,
+            'p25': p25,
+            'p50': p50,
+            'p75': p75,
+            'p95': p95
+        })
+    heatmap_data = np.array(heatmap_rows)
+    heatmap_vis = np.sqrt(heatmap_data) 
+    plt.figure(figsize=(14, 10))
+    ax = sns.heatmap(heatmap_vis, cmap="viridis", yticklabels=layer_names, cbar=False)
+    y_coords = np.arange(len(layer_names)) + 0.5
+    for i, s in enumerate(stats):
+        y = y_coords[i]
+        plt.plot([s['p05'], s['p95']], [y, y], color='white', linewidth=1, alpha=0.5)
+        plt.plot([s['p25'], s['p75']], [y, y], color='white', linewidth=4, alpha=0.6)
+        plt.plot(s['p50'], y, '|', color='cyan', markersize=10, markeredgewidth=2, label='Median' if i==0 else "")
+        plt.plot(s['peak'], y, '.', color='yellow', markersize=5, label='Peak' if i==0 else "")
+        plt.plot(s['p95'], y, '|', color='red', markersize=10, markeredgewidth=2, label='95% Cumul.' if i==0 else "")
+    plt.title(f"Energy Distribution per Layer\n(Target: {targets[0]}, Top {k_calc} Ranks)")
+    plt.xlabel("Principal Component (Rank Index)")
+    plt.ylabel("Layer Depth")
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='white', lw=4, label='IQR (25-75%)'),
+        Line2D([0], [0], color='cyan', marker='|', linestyle='None', label='Median (50%)'),
+        Line2D([0], [0], color='red', marker='|', linestyle='None', label='95% Cutoff'),
+        Line2D([0], [0], color='yellow', marker='o', linestyle='None', label='Peak Mode'),
+    ]
+    plt.legend(handles=legend_elements, loc='upper right')
+    plt.tight_layout()
+    print(f"\n[{PRETTY_HW}] Recommendation Report")
+    max_95 = max(s['p95'] for s in stats)
+    min_95 = min(s['p95'] for s in stats)
+    print(f"1. Conservative Rank (Max 95%): {max_95} (Safest)")
+    print(f"2. Aggressive Rank (Min 95%): {min_95} (Likely degradation)")
+    print(f"3. Average Median: {np.mean([s['p50'] for s in stats]):.1f}")
+
+def show_tie_2(model, collapse_cfg=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    targets, check_rank = collapse_cfg['targets'], collapse_cfg['rank']
+    layers = model.model.layers
+    layer_bases = []
+    layer_names = []
+    for i, l in enumerate(layers):
+        for name, m in l.named_modules():
+            if name in targets:
+                if isinstance(m, nn.QuantizedLinear):
+                    w = mx.dequantize(m.weight, m.scales, m.biases, m.group_size, m.bits)
+                else:
+                    w = m.weight
+                w_np = np.array(w.astype(mx.float32))
+                _, _, Vt = np.linalg.svd(w_np, full_matrices=False)
+                basis = Vt[:check_rank, :]
+                basis = basis / (np.linalg.norm(basis, axis=1, keepdims=True) + 1e-9)
+                layer_bases.append(basis)
+                layer_names.append(f"L{i}")
+    num_layers = len(layer_bases)
+    similarity_matrix = np.zeros((num_layers, num_layers))
+    for i in range(num_layers):
+        for j in range(i, num_layers):
+            corr = np.abs(np.dot(layer_bases[i], layer_bases[j].T))
+            score_i_j = np.mean(np.max(corr, axis=1))
+            score_j_i = np.mean(np.max(corr, axis=0))
+            avg_score = (score_i_j + score_j_i) / 2.0
+            similarity_matrix[i, j] = avg_score
+            similarity_matrix[j, i] = avg_score
+    np.fill_diagonal(similarity_matrix, 0.0)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(similarity_matrix, cmap="magma", xticklabels=layer_names, yticklabels=layer_names)
+    plt.title(f"Similarity (Target: {targets[0]})")
+    plt.savefig('_'.join(targets)+'.png')
+    print(f"\n[{PRETTY_HW}] Suggested Bundles (Threshold > 0.6)")
+    bundles = []
+    current_bundle = [0]
+    for i in range(1, num_layers):
+        ref_idx = current_bundle[0]
+        sim = similarity_matrix[ref_idx, i]
+        if sim > 0.6:
+            current_bundle.append(i)
+        else:
+            bundles.append(current_bundle)
+            current_bundle = [i]
+    bundles.append(current_bundle)
+    for b in bundles:
+        print(f"   -> Bundle: {b} (Size: {len(b)})")
+    return bundles
+
+def show_tie_3(model, collapse_cfg=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    targets = collapse_cfg.get('targets', ['self_attn.v_proj'])
+    check_rank = collapse_cfg.get('rank', 128)
+    layers = model.model.layers
+    layer_grams = []
+    layer_names = []
+    layer_traces = []
+    for i, l in enumerate(layers):
+        for name, m in l.named_modules():
+            if name in targets:
+                if isinstance(m, nn.QuantizedLinear):
+                    w = mx.dequantize(m.weight, m.scales, m.biases, m.group_size, m.bits)
+                else:
+                    w = m.weight
+                w_np = np.array(w.astype(mx.float32))
+                g = np.dot(w_np.T, w_np)
+                layer_grams.append(g)
+                layer_traces.append(np.trace(g))
+                layer_names.append(f"L{i}")
+    num_layers = len(layer_grams)
+    loss_matrix = np.zeros((num_layers, num_layers))
+    for i in range(num_layers):
+        for j in range(i, num_layers):
+            if i == j:
+                G_combined = layer_grams[i]
+                total_energy = layer_traces[i]
+            else:
+                G_combined = layer_grams[i] + layer_grams[j]
+                total_energy = layer_traces[i] + layer_traces[j]
+            eigvals = np.linalg.eigvalsh(G_combined) 
+            eigvals = np.flip(eigvals)
+            if check_rank < len(eigvals):
+                residual_energy = np.sum(eigvals[check_rank:])
+            else:
+                residual_energy = 0.0
+            loss = residual_energy / (total_energy + 1e-9)
+            loss_matrix[i, j] = loss
+            loss_matrix[j, i] = loss
+    plt.figure(figsize=(12, 10))
+    ax = sns.heatmap(loss_matrix, cmap="viridis_r", xticklabels=layer_names, yticklabels=layer_names)
+    plt.title(f"Pairwise Frobenius Loss (Basis Sharing Simulation)\nTarget: {targets[0]} | Shared Rank: {check_rank}\n(Yellow/Low is better)")
+    print(f"\n[{PRETTY_HW}] Suggested Bundles (Loss Threshold < 0.05)") 
+    bundles = []
+    current_bundle = [0]
+    threshold = 0.05
+    for i in range(1, num_layers):
+        ref_idx = current_bundle[0]
+        loss = loss_matrix[ref_idx, i]
+        if loss < threshold:
+            current_bundle.append(i)
+        else:
+            bundles.append(current_bundle)
+            current_bundle = [i]
+    bundles.append(current_bundle)
+    for b in bundles:
+        print(f"   -> Bundle: {b} (Size: {len(b)})")
+    return bundles
+
+def show_tie_4(model, collapse_cfg=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    if collapse_cfg is None: collapse_cfg = {}
+    targets = collapse_cfg.get('targets', ['self_attn.v_proj'])
+    rank_mode = 'dynamic' 
+    fixed_rank = collapse_cfg.get('rank', 128)
+    layers = model.model.layers
+    Ws = []
+    layer_names = []
+    for i, l in enumerate(layers):
+        for name, m in l.named_modules():
+            if name in targets:
+                if isinstance(m, nn.QuantizedLinear):
+                    w = mx.dequantize(m.weight, m.scales, m.biases, m.group_size, m.bits)
+                else:
+                    w = m.weight
+                Ws.append(np.array(w.astype(mx.float32)))
+                layer_names.append(f"L{i}")
+    num_layers = len(Ws)
+    loss_matrix = np.zeros((num_layers, num_layers))
+    rank_matrix = np.zeros((num_layers, num_layers))
+    for i in range(num_layers):
+        for j in range(i, num_layers):
+            if i == j:
+                W_comb = Ws[i]
+            else:
+                W_comb = np.concatenate([Ws[i], Ws[j]], axis=0)
+            G = np.dot(W_comb.T, W_comb)
+            S_sq = np.linalg.eigvalsh(G)
+            S_sq = np.flip(S_sq)
+            S_sq = np.maximum(S_sq, 0)
+            S = np.sqrt(S_sq)
+            if rank_mode == 'dynamic':
+                p = S / np.sum(S)
+                entropy = -np.sum(p * np.log(p + 1e-12))
+                eff_rank_val = np.exp(entropy)
+                k = int(eff_rank_val)
+            else:
+                k = fixed_rank
+            rank_matrix[i, j] = k
+            rank_matrix[j, i] = k
+            total_energy = np.sum(S_sq)
+            kept_energy = np.sum(S_sq[:k])
+            loss = 1.0 - (kept_energy / total_energy)
+            loss_matrix[i, j] = loss
+            loss_matrix[j, i] = loss
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+    sns.heatmap(loss_matrix, cmap="viridis_r", xticklabels=layer_names, yticklabels=layer_names, ax=ax1)
+    ax1.set_title(f"Frobenius Loss (Dynamic Rank)\n(Yellow/Low is better)")
+    sns.heatmap(rank_matrix, cmap="magma", xticklabels=layer_names, yticklabels=layer_names, ax=ax2)
+    ax2.set_title(f"Auto-Selected Effective Rank\n(Lighter = Higher Rank required)")
+    print(f"\n[{PRETTY_HW}] Diagonal Analysis (Self-Compressibility)")
+    for i in range(num_layers):
+        print(f"   L{i}: Rank {int(rank_matrix[i,i])} | Loss {loss_matrix[i,i]:.3f}")
+    return loss_matrix
+
+def prune(calib_ds_id, model, tokenizer, config, n_samples=64, bs=4, lambda_val=1.0, prune_ratio=0.3, verbose=True):
+    class UniQL_MLP_Collector(nn.Module):
+        def __init__(self, original_mlp, layer_idx, stats_dict, counts_dict):
+            super().__init__()
+            self.target = original_mlp 
+            self.layer_idx = layer_idx
+            self.stats = stats_dict
+            self.counts = counts_dict
+
+        def __call__(self, x):
+            gate = self.target.gate_proj(x)
+            up = self.target.up_proj(x)
+            h = nn.silu(gate) * up
+            h_flat = h.reshape(-1, h.shape[-1])
+            h_f32 = mx.stop_gradient(h_flat).astype(mx.float32)
+            c_batch = h_f32.T @ h_f32
+            if self.layer_idx not in self.stats:
+                self.stats[self.layer_idx] = c_batch
+                self.counts[self.layer_idx] = h_flat.shape[0]
+            else:
+                self.stats[self.layer_idx] = self.stats[self.layer_idx] + c_batch
+                self.counts[self.layer_idx] = self.counts[self.layer_idx] + h_flat.shape[0]
+            return self.target.down_proj(h)
+
+    stats = {} 
+    counts = {}
+    original_mlps = {}
+    
+    for i, layer in enumerate(model.model.layers):
+        original_mlps[i] = layer.mlp
+        layer.mlp = UniQL_MLP_Collector(layer.mlp, i, stats, counts)
+
+    from datasets import load_dataset
+    ds = load_dataset(calib_ds_id, split="test", streaming=True)
+    data_iter = iter(ds)
+    
+    model.eval()
+    processed = 0
+    pbar = tqdm(total=n_samples, desc="Calibrating MLP")
+    cache = [lambda x, y: (x, y)] * len(model.model.layers)
+
+    while processed < n_samples:
+        batch_prompts = []
+        for _ in range(bs):
+            try:
+                row = next(data_iter)
+                txt = row.get('text', row.get('prompt', row.get('description', ''))) # ad hoc
+                if txt: batch_prompts.append(txt)
+            except StopIteration:
+                break
+        
+        if not batch_prompts: break
+
+        for txt in batch_prompts:
+            if processed >= n_samples: break
+            ids = tokenizer.encode(txt)
+            if len(ids) == 0: continue
+            ids = mx.array([ids])
+            B, L = ids.shape
+            roper = Roper(config, L)
+            rope = roper(mx.arange(L)[None, :])
+            mask = create_causal_mask(mx.array([[True]*L]))
+            try:
+                model(ids, mask, rope, cache)
+                mx.eval(stats)
+            except Exception as e:
+                print(f"Warning: Batch failed {e}")
+            processed += 1
+            pbar.update(1)
+    pbar.close()
+
+    for i, layer in enumerate(model.model.layers):
+        layer.mlp = original_mlps[i]
+
+    if not stats:
+        print("Error: No stats collected.")
+        return model
+
+    for i in range(len(model.model.layers)):
+        if i not in stats: continue
+        
+        C = stats[i] / counts[i]
+        D_int = C.shape[0]
+        
+        reg = C + (lambda_val * mx.eye(D_int, dtype=mx.float32))
+        reg_inv = mx.linalg.inv(reg, stream=mx.cpu)
+        s = mx.diag(C @ reg_inv)
+
+        perm = mx.argsort(s)[::-1]
+        
+        mlp = model.model.layers[i].mlp
+        
+        mlp.gate_proj.weight = mlp.gate_proj.weight[perm]
+        mlp.up_proj.weight   = mlp.up_proj.weight[perm]
+        mlp.down_proj.weight = mlp.down_proj.weight[:, perm]
+
+        if prune_ratio > 0.0:
+            keep = int(D_int * (1.0 - prune_ratio))
+            mlp.gate_proj.weight = mlp.gate_proj.weight[:keep]
+            mlp.up_proj.weight   = mlp.up_proj.weight[:keep]
+            mlp.down_proj.weight = mlp.down_proj.weight[:, :keep]
+            if i == 0 and verbose: print(f"   Layer 0 pruned to {keep}/{D_int}")
+
+    mx.eval(model)
+    return model
+
+def cascade(ds_id, model, tokenizer, config, teacher, to='distilled.safetensors', collapse_ranges=None):
+    if collapse_ranges is None:
+        collapse_ranges = [(9,13), (13,17)]
+    for range_tuple in collapse_ranges:
+        model = collapse(model, collapse_ranges=[range_tuple])
+        model = distill(ds_id, model, tokenizer, config, teacher, to=to)
+    return model
+
+def dampen(model, lambda_val=0.3, sim_threshold=0.5, ft_check_rank=1024, verbose=True):
+    from mlx.utils import tree_unflatten
+
+    def to_np(x): 
+        return np.array(x.astype(mx.float32))
+
+    replacements = []
+    
+    for name, module in model.named_modules():
+        if isinstance(module, DoRALinear):
+            if verbose:
+                print(f"[{PRETTY_HW}] Processing {name}...")
+            W_0_mx = module._dequantized_weight()
+            dtype = W_0_mx.dtype
+            delta = (module.scale * module.lora_b.T) @ module.lora_a.T
+            W_prime = W_0_mx + delta
+            
+            norm_W_prime = mx.linalg.norm(W_prime, axis=1, keepdims=True)
+            scale_vec = module.m[:, None] / (norm_W_prime) 
+            W_ft_mx = scale_vec * W_prime
+            
+            W_0 = to_np(W_0_mx)
+            W_ft = to_np(W_ft_mx)
+            
+            U_ft, S_ft, Vt_ft = np.linalg.svd(W_ft, full_matrices=False)
+            U_0, _, _ = np.linalg.svd(W_0, full_matrices=False)
+            U_ref = U_0
+            
+            k_check = min(ft_check_rank, U_ft.shape[1])
+            U_check = U_ft[:, :k_check]
+            
+            # projections = np.dot(U_check.T, U_ref)
+            # similarities = np.sqrt(np.sum(projections**2, axis=1))
+            similarity_matrix = np.abs(np.dot(U_check.T, U_0))
+            similarities = np.max(similarity_matrix, axis=1)
+            
+            is_intruder = similarities < sim_threshold
+            intruder_indices = np.where(is_intruder)[0]
+            
+            if len(intruder_indices) > 0:
+                worst_idx_local = np.argmin(similarities[intruder_indices])
+                worst_idx_global = intruder_indices[worst_idx_local]
+                worst_sim = similarities[worst_idx_global]
+                remove_factor = (1.0 - lambda_val)
+                intruder_vec = np.outer(U_ft[:, worst_idx_global], Vt_ft[worst_idx_global, :])
+                intruder_component = intruder_vec * S_ft[worst_idx_global]
+                subtraction_matrix = intruder_component * remove_factor
+                if verbose:
+                    print(f"   -> Found {len(intruder_indices)} candidates.")
+                    print(f"   -> Subtracting {(remove_factor*100):.0f}% of rank {worst_idx_global} (Sim: {worst_sim:.4f})")
+                W_final_mx = W_ft_mx - mx.array(subtraction_matrix)
+            else:
+                if verbose:
+                    print(f"   -> No strong intruders found. Keeping exact weights.")
+                W_final_mx = W_ft_mx
+            out_d, in_d = W_final_mx.shape
+            has_bias = hasattr(module.linear, 'bias') and (module.linear.bias is not None)
+            new_linear = nn.Linear(in_d, out_d, bias=has_bias)
+            new_linear.weight = W_final_mx.astype(dtype)
+            if has_bias:
+                new_linear.bias = module.linear.bias
+            replacements.append((name, new_linear))
+    if replacements:
+        model.update_modules(tree_unflatten(replacements))
+        print(f"[{PRETTY_HW}] Successfully healed and merged {len(replacements)} layers.")
+    else:
+        print("No DoRALinear layers found.")
+    mx.eval(model)
+    return model
+# }}} === MISC ===
 # {{{ === DoRA ===
 class DoRALinear(nn.Module):
     @staticmethod
@@ -586,7 +1006,7 @@ class DoRALinear(nn.Module):
         denom = mx.linalg.norm(adapted, axis=1)
         z = (self.m / denom) * z
         z = z + bias
-        return z#.astype(x.dtype)
+        return z
 
 def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scale, lora_dropout, lora_quantize, lora_class):
     if lora_quantize:
@@ -607,7 +1027,7 @@ def linear_to_lora_layers(model, lora_layers, lora_targets, lora_rank, lora_scal
         loralized = [(k, to_lora(m)) for k, m in l.named_modules() if k in lora_targets]
         l.update_modules(tree_unflatten(loralized))
 # }}} === DoRA ===
-# {{{ === LoRA-XS ===
+# {{{ === LoRAXS ===
 class LoRAXSLinear(nn.Module):
     @staticmethod
     def from_linear(linear, r, dropout=0.0, verbose=False, **kwargs):
@@ -615,8 +1035,7 @@ class LoRAXSLinear(nn.Module):
             w = mx.dequantize(linear.weight, linear.scales, linear.biases, linear.group_size, linear.bits)
         else:
             w = linear.weight
-        import numpy as np
-        w_np = np.array(w.astype(mx.float32)) # shape (out, in)
+        w_np = np.array(w.astype(mx.float32)) 
         U, S, Vt = np.linalg.svd(w_np, full_matrices=False)
         U_r = mx.array(U[:, :r])
         Vt_r = mx.array(Vt[:r, :])
@@ -638,43 +1057,43 @@ class LoRAXSLinear(nn.Module):
         h = h @ self.R.T
         h = h @ self.U.T
         return y + h
-# }}} === LoRA-XS ===
+# }}} === LoRAXS ===
 # {{{ === DRINK ===
-class LowRankLinear(nn.Module):
+def _trunc_SVD(U, S, Vt, rank):
+    U_k = U[:, :rank]
+    S_k = S[:rank]
+    Vt_k = Vt[:rank, :]
+    return U_k, S_k, Vt_k
+
+class LoRAONLynear(nn.Module):
     @staticmethod
-    def from_linear(linear, U, S, Vt, rank):
-        U_k = U[:, :rank]
-        S_k = S[:rank]
-        Vt_k = Vt[:rank, :]
-        # {{ v0
-        # A_np = U_k * S_k[None, :]
-        # B_np = Vt_k
-        # }} v0
-        # {{ v1
-        import numpy as np
-        sqrt_S = np.sqrt(S_k)
-        A_np = U_k * sqrt_S[None, :]  
-        B_np = sqrt_S[:, None] * Vt_k 
-        # }} v1
-        out_dims, in_dims = linear.weight.shape
-        bias = "bias" in linear
-        lrl = LowRankLinear(in_dims, out_dims, rank, bias)
-        lrl.lora_b.weight = mx.array(B_np, dtype=linear.weight.dtype) 
-        lrl.lora_a.weight = mx.array(A_np, dtype=linear.weight.dtype)
-        if bias:
-            lrl.lora_a.bias = linear.bias
+    def from_weights(A, B, linear=None, bias=None, indices=None):
+        has_bias = (bias is not None)
+        lrl = LoRAONLynear(A.shape[1], B.shape[0], A.shape[0], bias=has_bias)
+        if has_bias:
+            lrl.lora_b.bias = bias
+        lrl.lora_a.weight = mx.array(A)
+        lrl.lora_b.weight = mx.array(B)
+        lrl.linear = linear
+        lrl.indices = mx.array(indices) if indices is not None else None
         return lrl
 
     def __init__(self, in_dims, out_dims, rank, bias=False):
         super().__init__()
-        self.lora_b = nn.Linear(in_dims, rank, bias=False)
-        self.lora_a = nn.Linear(rank, out_dims, bias=bias)
+        self.lora_a = nn.Linear(in_dims, rank, bias=False)
+        self.lora_b = nn.Linear(rank, out_dims, bias=bias)
+        self.linear = None
+        self.indices = None
 
     def __call__(self, x):
-        return self.lora_a(self.lora_b(x))
+        out = self.lora_b(self.lora_a(x))
+        if self.linear is not None:
+            out = out + self.linear(x)
+        if self.indices is not None:
+            out = out[..., self.indices]
+        return out
 
 def drink(model, compression_ratio=0.2, dry_run=False):
-    import numpy as np
     targets = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
                "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"]
     layers = model.model.layers
@@ -730,25 +1149,80 @@ def drink(model, compression_ratio=0.2, dry_run=False):
         current_params = s['shape'][0] * s['shape'][1]
         new_params = (s['shape'][0] + s['shape'][1]) * k_target
         if new_params >= current_params:
-            if dry_run: print(f"   Skipping {s['full_path']}: Compress ({new_params}) > Org ({current_params})")
+            print(f"   Skipping {s['full_path']}: Compress ({new_params}) > Org ({current_params})")
             continue
-        if dry_run:
-            print(f"   {s['full_path']:<40} | EffR: {s['eff_rank']:6.1f} | k: {max_rank} -> {k_target}")
-        else:
-            lrl = LowRankLinear.from_linear(s['module'], s['U'], s['S'], s['Vt'], k_target)
-            layer = layers[s['layer_idx']]
-            parts = s['name'].split('.')
-            parent = layer
-            for p in parts[:-1]:
-                parent = getattr(parent, p)
-            setattr(parent, parts[-1], lrl)
-    if dry_run:
-        print("[Dry Run] No changes applied.")
-    else:
-        mx.eval(model)
+        print(f"   {s['full_path']:<40} | EffR: {s['eff_rank']:6.1f} | k: {max_rank} -> {k_target}")
+        # {{
+        _U, _S, _Vt = _trunc_SVD(s['U'], s['S'], s['Vt'], k_target)
+        sqrt_S = np.sqrt(_S)
+        B_np = _U * sqrt_S[None, :]  
+        A_np = sqrt_S[:, None] * _Vt
+        lrl_bias = s['module'].bias if "bias" in s['module'] else None
+        # }}
+        lrl = LoRAONLynear.from_weights(A_np, B_np, linear=None, bias=lrl_bias)
+        layer = layers[s['layer_idx']]
+        parts = s['name'].split('.')
+        parent = layer
+        for p in parts[:-1]:
+            parent = getattr(parent, p)
+        setattr(parent, parts[-1], lrl)
+    mx.eval(model)
     model.teacher_to_student = [(_l, _l) for _l in range(len(model.model.layers))]
     return model
 # }}} === DRINK ===
+# {{{ === RCR
+class RecurrentBlock(nn.Module):
+    def __init__(self, layer, n_rcr=3):
+        super().__init__()
+        self.layer = layer
+        self.n_rcr = n_rcr
+
+    def __call__(self, x, attention_mask=None, rope=None, cache=None):
+        B, L, D = x.shape
+        for i in range(self.n_rcr):
+        # for i in range(1): # https://openreview.net/forum?id=ngmEcEer8a
+            # if getattr(cache, "rollback", None):
+            #     cache.rollback(L*(i>0))
+            # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
+            c = cache[i] if isinstance(cache, list) else cache
+            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=c)
+        return x
+
+def collapse(model, collapse_ranges=None, do_rectify=False, do_quantize=False):
+    if collapse_ranges is None:
+        collapse_ranges = [(13,17)]
+    layers = model.model.layers
+    new_layers = []
+    teacher_to_student = [] 
+    start_to_range = {start: (start, end) for start, end in collapse_ranges}
+    indices_to_skip = set()
+    for start, end in collapse_ranges:
+        for i in range(start + 1, end):
+            indices_to_skip.add(i)
+    teacher_offset = 0
+    for i, layer in enumerate(layers):
+        student_idx = len(new_layers)
+        if i in start_to_range:
+            start, end = start_to_range[i]
+            n_rcr = end - start
+            teacher_to_student.append((teacher_offset+end - 1, student_idx))
+            ref_layer = layer
+            if hasattr(ref_layer.self_attn, 'to_retention') and do_rectify:
+                ref_layer.self_attn = ref_layer.self_attn.to_retention(model._config)
+            rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr)
+            new_layers.append(rec_block)
+        elif i in indices_to_skip:
+            continue
+        else:
+            if getattr(layer, 'n_rcr', None):
+                teacher_offset += (layer.n_rcr-1)
+            new_layers.append(layer)
+    model.model.layers = new_layers
+    model.teacher_to_student = teacher_to_student
+    if do_quantize:
+        nn.quantize(model, 32, 8, class_predicate=lambda p, m: (isinstance(m, nn.Linear) or isinstance(m, nn.Embedding)) and not p.endswith('_new'))
+    return model
+# }}} === RCR
 # {{{ === TRAIN ===
 def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, lora_cfg=None):
     LORA_CFG = dict(layers='all', targets=['self_attn.o_proj'], rank=32, scale=0.1, dropout=0.0,
@@ -779,7 +1253,37 @@ def train(ds_id, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024, l
     mx.clear_cache()
     return model
 
-class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115 kinda but not rly
+def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors', add_dora=True, unfreeze_all=False):
+    teacher_to_student = getattr(model, "teacher_to_student", None)
+    student_indices = [s[1] for s in teacher_to_student] if teacher_to_student else []
+    print(f'{teacher_to_student=}')
+    from mlx.utils import tree_unflatten
+    model.freeze()
+    def to_dora_(layer):
+        _rank = 64
+        return DoRALinear.from_linear(layer, r=_rank, alpha=_rank, scale=1.0, dropout=0.0)
+    if add_dora:
+        for layer_idx, l in enumerate(model.model.layers):
+            if getattr(l, 'n_rcr', None) and (layer_idx in student_indices):
+                print(f'{layer_idx=}')
+                loralized = [(k, to_dora_(m)) for k, m in l.named_modules() if k.endswith('proj')]
+                l.update_modules(tree_unflatten(loralized))
+                l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('_new') else None)
+    if unfreeze_all or not add_dora:
+        for l in model.model.layers:
+            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(('lora_a', 'lora_b')) else None)
+    print_trainable_parameters(model)
+    from datasets import load_dataset
+    ds = load_dataset(ds_id, split="test").to_list()
+    ds = ds#[:200]
+    ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
+    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
+    from mlx.utils import tree_flatten
+    mx.save_safetensors(to, dict(tree_flatten(model.parameters())), metadata=None) # just to see how small; [] need quant params to load though
+    mx.clear_cache()
+    return model
+
+class AutoBalancingStudent(nn.Module): # https://arxiv.org/pdf/1705.07115
     def __init__(self, student):
         super().__init__()
         self.student = student
@@ -936,336 +1440,463 @@ def _train(ds, model, tokenizer, config, n_epochs=2, lr=1e-4, bs=2, sl=1024,
         print('└ test output:', _dict_eval['out_str'])
         
     if teacher is not None:
-        # print(model.log_var_logits, model.log_var_hiddens)
         return model.student
     return model
 
 # }}} === TRAIN ===
-# {{{ === SVD ===
-def svdlora(model, tokenizer, config, collapse_cfg=None):
-    import numpy as np
-    COLLAPSE_CFG = dict(k=256, rank=32, targets=['self_attn.v_proj'])
-    if collapse_cfg is None:
-        collapse_cfg = {}
-    collapse_cfg = COLLAPSE_CFG|collapse_cfg
-    targets = collapse_cfg['targets']
-    k=collapse_cfg['k']
-    rank=collapse_cfg['rank']
-    # ---
-    tic_clp = time.perf_counter()
-    layers = model.model.layers
-    Ws = []
-    for l in layers:
-        Ws += [m.weight for k, m in l.named_modules() if k in targets]
-    n = len(Ws)
-    d1, d2 = Ws[0].shape
-    print(f'{d1=}')
-    print(f'{d2=}')
-    W_cat = mx.concatenate(Ws, axis=1)
-    # U, S, Vt = mx.linalg.svd(W_cat.astype(mx.float32), stream=mx.cpu) # mlx svd as of v0.30.0 doesn't support gpu nor thinning; crashes too..
-    # mx.eval(U, S, Vt)
-    U, S, Vt = np.linalg.svd(W_cat.astype(mx.float32), full_matrices=False) # can thin svd but slow af
-    Ws = [np.array(_w.astype(mx.float32)) for _w in Ws]
-    k_eff = min(k, d1)
-    U_k = U[:, :k_eff]
-    S_k = S[:k_eff]
-    Vt_k = Vt[:k_eff, :]
-    B = U_k * S_k[None,:]
-    Cs = [Vt_k[:, i*d2:(i+1)*d2] for i in range(n)]
-    Rs = []
-    for w, c in zip(Ws, Cs):
-        Rs.append(w - B@c)
-    LoRAs = []
-    for R in Rs:
-        # U, S, Vt = mx.linalg.svd(R, stream=mx.cpu)
-        U, S, Vt = np.linalg.svd(R, full_matrices=False)
-        # r_eff = min(rank, d1)
-        r_eff = d1 # sanity check
-        if r_eff>0:
-            LoRAs.append([U[:, :r_eff]*S[None, :r_eff], Vt[:r_eff, :]])
-        else:
-            LoRAs.append([0,0])
-    w0_recon = B@Cs[0] + LoRAs[0][0]@LoRAs[0][1]
-    print(f'{Ws[0]=}')
-    print(f'{w0_recon=}')
-    elp_clp = time.perf_counter() - tic_clp
-    print(f'{elp_clp=:.1f}')
+# {{{ === TIE ===
 
-def prune(calib_ds_id, model, tokenizer, config, n_samples=64, bs=4, lambda_val=1.0, prune_ratio=0.3, verbose=True):
-    class UniQL_MLP_Collector(nn.Module):
-        def __init__(self, original_mlp, layer_idx, stats_dict, counts_dict):
+def tie(model, tokenizer, config, collapse_cfg=None, do_calib=True, len_calib=256, n_calib_samples=64, bs=4, show=False):
+    from mlx.utils import tree_unflatten
+
+    if collapse_cfg is None:
+        collapse_cfg = [
+            {'rank': 64, 'targets': ['self_attn.v_proj'], 'layers': [10,11,12,13,14]},
+        ]
+    
+    if show:
+        # show_cfg = [dict(targets=[_t], rank=32) for _t in ['self_attn.q_proj', 'self_attn.k_proj', 'self_attn.v_proj', 'mlp.gate_proj', 'mlp.up_proj']]
+        show_cfg = [dict(targets=[_t], rank=32) for _t in ['self_attn.v_proj']]
+        try:
+            import matplotlib.pyplot as plt
+            for _c_cfg in show_cfg:
+                # show_tie_1(model, _c_cfg)
+                # show_tie_2(model, _c_cfg)
+                # show_tie_3(model, _c_cfg)
+                show_tie_4(model, _c_cfg)
+            plt.show()
+        except Exception as e:
+            print(f"[{PRETTY_HW}] Visualization skipped: {e}")
+
+    # {{ --- Calib ---
+    layer_stats = {}
+    if do_calib:
+        class ActivationCollector(nn.Module):
+            def __init__(self, original_module, stats_ref, layer_key):
+                super().__init__()
+                self.target = original_module
+                self.stats = stats_ref
+                self.key = layer_key
+
+            def __call__(self, x, *args, **kwargs):
+                x_flat = x.reshape(-1, x.shape[-1])
+                x_f32 = mx.stop_gradient(x_flat).astype(mx.float32)
+                
+                c_batch = x_f32.T @ x_f32
+                
+                if self.key not in self.stats:
+                    self.stats[self.key] = c_batch
+                else:
+                    self.stats[self.key] = self.stats[self.key] + c_batch
+                
+                return self.target(x, *args, **kwargs)
+
+        original_modules = {}
+        target_layer_indices = set()
+        target_module_names = set()
+        
+        for cfg in collapse_cfg:
+            layers_indices = cfg.get('layers', [])
+            if layers_indices:
+                target_layer_indices.update(layers_indices)
+            if 'targets' in cfg:
+                target_module_names.update(cfg['targets'])
+
+        for i, l in enumerate(model.model.layers):
+            if i in target_layer_indices:
+                for name, m in l.named_modules():
+                    if name in target_module_names:
+                        full_name = f"{i}.{name}"
+                        original_modules[full_name] = m
+                        collector = ActivationCollector(m, layer_stats, full_name)
+                        parts = name.split('.')
+                        parent = l
+                        for p in parts[:-1]:
+                            parent = getattr(parent, p)
+                        setattr(parent, parts[-1], collector)
+
+        roper = Roper(config, len_calib)
+
+        from datasets import load_dataset
+        ds = load_dataset('Salesforce/wikitext', 'wikitext-103-v1', split="train", streaming=True)
+        # ds = ds.filter(lambda example: len(example.get('text', '')) > (len_calib * 2))
+        data_iter = iter(ds)
+        
+        model.eval()
+        processed = 0
+        pbar = tqdm(total=n_calib_samples, desc="Collecting Activations")
+        cache = [lambda x, y: (x, y)] * len(model.model.layers)
+
+        while processed < n_calib_samples:
+            batch_iids = []
+            while len(batch_iids) < bs:
+                try:
+                    row = next(data_iter)
+                    txt = row.get('text', row.get('prompt', row.get('description', '')))
+                    if txt: 
+                        iid = tokenizer.encode(txt)
+                        # if len(iid) > len_calib:
+                        #     batch_iids.append(iid[:len_calib])
+                        batch_iids.append(iid)
+                except StopIteration:
+                    break
+
+            if not batch_iids: break
+
+            max_len = max(len(t) for t in batch_iids) 
+            if max_len == 0: continue
+            input_ids = np.zeros((len(batch_iids), max_len), dtype=int)
+            for i, t in enumerate(batch_iids):
+                input_ids[i, :len(t)] = t
+            
+            input_ids_mx = mx.array(input_ids)
+            B, L = input_ids_mx.shape
+
+            rope = roper(mx.arange(L)[None, :])
+            mask = create_causal_mask(mx.array([[True]*L]*B))
+                
+            model(input_ids_mx, mask, rope, cache) 
+            mx.eval(layer_stats)
+            
+            processed += len(batch_iids)
+            pbar.update(len(batch_iids))
+        
+        pbar.close()
+
+        for i, l in enumerate(model.model.layers):
+            if i in target_layer_indices:
+                for name, m in l.named_modules():
+                    if name in target_module_names:
+                        full_name = f"{i}.{name}"
+                        if full_name in original_modules:
+                            parts = name.split('.')
+                            parent = l
+                            for p in parts[:-1]:
+                                parent = getattr(parent, p)
+                            setattr(parent, parts[-1], original_modules[full_name])
+        mx.eval(model)
+    # }} --- Calib ---
+
+    print(f"[{PRETTY_HW}] Compressing using Vertical Stacking (Input Basis Sharing)...")
+
+    all_replacements = []
+
+    for cfg_idx, cfg in enumerate(collapse_cfg):
+        targets = cfg.get('targets', ['self_attn.v_proj'])
+        target_rank = cfg.get('rank', 16)
+        target_layers = cfg.get('layers', [])
+        
+        if not target_layers: continue
+
+        print(f"   -> Group {cfg_idx}: Rank={target_rank}, Targets={targets}, Layers={target_layers}")
+
+        Ws = []
+        layer_indices = []
+        bundle_cov = None
+        
+        for i, l in enumerate(model.model.layers):
+            if i not in target_layers: continue 
+            
+            for name, m in l.named_modules():
+                if name in targets:
+                    if isinstance(m, nn.QuantizedLinear):
+                        w = mx.dequantize(m.weight, m.scales, m.biases, m.group_size, m.bits)
+                    else:
+                        w = m.weight
+                    
+                    Ws.append(w)
+                    layer_indices.append((i, name, m))
+                    
+                    if do_calib:
+                        full_name = f"{i}.{name}"
+                        if full_name in layer_stats:
+                            if bundle_cov is None:
+                                bundle_cov = layer_stats[full_name]
+                            else:
+                                bundle_cov = bundle_cov + layer_stats[full_name]
+
+        if not Ws: continue
+
+        W_tall_mx = mx.concatenate(Ws, axis=0)
+        W_tall_np = np.array(W_tall_mx.astype(mx.float32))
+        d_out_total, d_in = W_tall_np.shape
+        
+        S_inv_np = None
+        if do_calib and bundle_cov is not None:
+            cov_np = np.array(bundle_cov.astype(mx.float32))
+            ridge = 0.01 * np.mean(np.diag(cov_np))
+            cov_reg = cov_np + ridge * np.eye(d_in, dtype=cov_np.dtype)
+            try:
+                S_cov_np = np.linalg.cholesky(cov_reg)
+                S_inv_np = np.linalg.inv(S_cov_np)
+                W_tall_np = W_tall_np @ S_cov_np
+                print(f"      -> Group {cfg_idx}: ASVD scaling applied.")
+            except Exception as e:
+                print(f"      ! Cholesky failed for Group {cfg_idx}: {e}. Using standard SVD.")
+                S_inv_np = None
+
+        U, S, Vt = np.linalg.svd(W_tall_np, full_matrices=False)
+
+        k_eff = min(target_rank, len(S))
+        S_sqrt = np.sqrt(S[:k_eff])
+        Vt_trunc = Vt[:k_eff, :] 
+        
+        if S_inv_np is not None:
+            Vt_trunc = Vt_trunc @ S_inv_np
+        
+        A_shared = S_sqrt[:, None] * Vt_trunc
+        A_shared_mx = mx.array(A_shared)
+        
+        shared_lora_a = nn.Linear(d_in, k_eff, bias=False)
+        shared_lora_a.weight = A_shared_mx
+
+        U_trunc = U[:, :k_eff]
+        B_total = U_trunc * S_sqrt[None, :] 
+        
+        current_row_offset = 0
+        for (layer_idx, name, orig_module) in layer_indices:
+            h = orig_module.weight.shape[0]
+            B_specific = B_total[current_row_offset : current_row_offset + h, :]
+            current_row_offset += h
+
+            has_bias = "bias" in orig_module
+            lrl = LoRAONLynear(d_in, h, k_eff, bias=has_bias)
+            
+            lrl.lora_a = shared_lora_a
+            
+            lrl.lora_b.weight = mx.array(B_specific)
+            if has_bias:
+                lrl.lora_a.bias = orig_module.bias
+
+            all_replacements.append((f"layers.{layer_idx}.{name}", lrl))
+        
+        print(f"      -> Compressed {len(Ws)} layers in Group {cfg_idx} to rank {k_eff}.")
+
+    if all_replacements:
+        model.model.update_modules(tree_unflatten(all_replacements))
+        mx.eval(model)
+        print(f"[{PRETTY_HW}] Tie Complete. Replaced {len(all_replacements)} modules.")
+    
+    return model
+
+# }}} === TIE ===
+# {{{ === DEACON ===
+def deacon(model, tokenizer, config, groups=None, rank=64, verbose=True, do_align=True):
+    from mlx.utils import tree_unflatten
+    try:
+        from scipy.optimize import linear_sum_assignment
+    except ImportError:
+        do_align = False
+    
+    if groups is None: groups = [(0, len(model.model.layers))]
+    targets = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
+               "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"]
+
+    for start, end in groups:
+        layers = list(range(start, end))
+        if len(layers) < 2: continue
+        for name in targets:
+            modules = []
+            for i in layers:
+                m = model.model.layers[i]
+                for p in name.split('.'): m = getattr(m, p)
+                modules.append((i, m))
+            Ws = [np.array(m.weight.astype(mx.float32)) for _, m in modules]
+            if not Ws: continue
+            W_ref = Ws[0]
+            aligned, perms = [W_ref], [None]
+            for W in Ws[1:]:
+                if do_align:
+                    cost = -np.dot(W / np.linalg.norm(W, axis=1, keepdims=True), 
+                                   (W_ref / np.linalg.norm(W_ref, axis=1, keepdims=True)).T)
+                    r_ind, c_ind = linear_sum_assignment(cost)
+                    P = np.argsort(c_ind)
+                    W_aligned = W[c_ind, :] 
+                    aligned.append(W_aligned)
+                    perms.append(np.argsort(c_ind)) 
+                else:
+                    aligned.append(W)
+                    perms.append(None)
+            W_base = np.mean(np.stack(aligned), axis=0)
+            base_mod = nn.Linear(W_base.shape[1], W_base.shape[0], bias=False)
+            base_mod.weight = mx.array(W_base)
+            replacements = []
+            for i, (l_idx, orig) in enumerate(modules):
+                R = aligned[i] - W_base
+                U, S, Vt = np.linalg.svd(R, full_matrices=False)
+                sqrt_S = np.sqrt(S[:rank])
+                A = sqrt_S[:, None] * Vt[:rank, :]
+                B = U[:, :rank] * sqrt_S[None, :]
+                bias = orig.bias if "bias" in orig and orig.bias is not None else None
+                new_mod = LoRAONLynear.from_weights(A, B, base_mod, bias=bias, indices=perms[i])
+                replacements.append((f"layers.{l_idx}.{name}", new_mod))
+            model.model.update_modules(tree_unflatten(replacements))
+    mx.eval(model)
+    return model
+# }}} === DEACON ===
+# {{{ === FISH ===
+def fish(model, tokenizer, config, calib_ds_id, n_samples=64, bs=4, rank=32, targets=None, verbose=True):
+    from mlx.utils import tree_unflatten, tree_flatten
+    if targets is None:
+        targets = ["self_attn.v_proj", "self_attn.o_proj", "mlp.down_proj"]
+    stats_registry = {}
+
+    def update_sym_matrix(old_mat, new_vecs):
+        flat = new_vecs.reshape(-1, new_vecs.shape[-1])
+        prod = flat.T @ flat 
+        if old_mat is None:
+            return prod
+        return old_mat + prod
+
+    class GFWWrapper(nn.Module):
+        def __init__(self, linear, layer_id):
             super().__init__()
-            self.target = original_mlp 
-            self.layer_idx = layer_idx
-            self.stats = stats_dict
-            self.counts = counts_dict
+            self.linear = linear
+            self.layer_id = layer_id
+            self.probe = mx.zeros((1,)) 
+            stats_registry[layer_id] = {'n': 0, 'S_in': None, 'S_out': None}
 
         def __call__(self, x):
-            gate = self.target.gate_proj(x)
-            up = self.target.up_proj(x)
-            h = nn.silu(gate) * up
-            h_flat = h.reshape(-1, h.shape[-1])
-            h_f32 = mx.stop_gradient(h_flat).astype(mx.float32)
-            c_batch = h_f32.T @ h_f32
-            if self.layer_idx not in self.stats:
-                self.stats[self.layer_idx] = c_batch
-                self.counts[self.layer_idx] = h_flat.shape[0]
-            else:
-                self.stats[self.layer_idx] = self.stats[self.layer_idx] + c_batch
-                self.counts[self.layer_idx] = self.counts[self.layer_idx] + h_flat.shape[0]
-            return self.target.down_proj(h)
-
-    stats = {} 
-    counts = {}
-    original_mlps = {}
+            if not self.training:
+                return self.linear(x)
+            y = self.linear(x)
+            x_detached = mx.stop_gradient(x)
+            stats = stats_registry[self.layer_id]
+            stats['S_in'] = update_sym_matrix(stats['S_in'], x_detached)
+            stats['n'] += (x.shape[0] * x.shape[1])
+            return y + self.probe
+    original_modules = {}
+    wrappers = []
+    model.freeze() 
+    for i, l in enumerate(model.model.layers):
+        for name, m in l.named_modules():
+            if name in targets and isinstance(m, nn.Linear):
+                full_path = f"{i}.{name}"
+                original_modules[full_path] = m
+                wrapper = GFWWrapper(m, full_path)
+                wrappers.append(wrapper)
+                parts = name.split('.')
+                parent = l
+                for p in parts[:-1]:
+                    parent = getattr(parent, p)
+                setattr(parent, parts[-1], wrapper)
     
-    for i, layer in enumerate(model.model.layers):
-        original_mlps[i] = layer.mlp
-        layer.mlp = UniQL_MLP_Collector(layer.mlp, i, stats, counts)
+    print(f"   -> Instrumented {len(wrappers)} layers. Starting Calibration...")
 
     from datasets import load_dataset
     ds = load_dataset(calib_ds_id, split="test", streaming=True)
     data_iter = iter(ds)
+    cache = [(lambda x,y:(x,y)) for _ in range(len(model.model.layers))]
     
-    model.eval()
+    def step_fn(model, x, mask, rope):
+        logits = model(x, mask, rope, cache)
+        logits = logits[:, :-1, :]
+        targets = x[:, 1:]
+        loss = nn.losses.cross_entropy(logits, targets)
+        return mx.mean(loss)
+    
+    loss_and_grad = nn.value_and_grad(model, step_fn)
+    
+    model.train()
     processed = 0
-    pbar = tqdm(total=n_samples, desc="Calibrating MLP")
-    cache = [lambda x, y: (x, y)] * len(model.model.layers)
-
+    pbar = tqdm(total=n_samples, desc="Fisher Calibration")
+    
     while processed < n_samples:
-        batch_prompts = []
-        for _ in range(bs):
+        batch_iids = []
+        while len(batch_iids) < bs:
             try:
                 row = next(data_iter)
-                txt = row.get('text', row.get('prompt', row.get('description', ''))) # ad hoc
-                if txt: batch_prompts.append(txt)
+                txt = row.get('text', row.get('prompt', row.get('description', '')))
+                if txt: batch_iids.append(tokenizer.encode(txt))
             except StopIteration:
                 break
+        if not batch_iids: break
         
-        if not batch_prompts: break
+        max_len = max(len(t) for t in batch_iids)
+        input_ids = np.zeros((len(batch_iids), max_len), dtype=int)
+        for i, t in enumerate(batch_iids): input_ids[i, :len(t)] = t
+        input_ids = mx.array(input_ids)
+        B, L = input_ids.shape
+        
+        for w in wrappers:
+            out_dim = w.linear.weight.shape[0]
+            w.probe = mx.zeros((B, L, out_dim))
+        
+        roper = Roper(config, L)
+        rope = roper(mx.arange(L)[None, :])
+        mask = create_causal_mask(mx.array([[True]*L]*B))
+        
+        loss, grads = loss_and_grad(model, input_ids, mask, rope)
+        
+        grad_leaves = tree_flatten(grads)
+        for path, g_val in grad_leaves:
+            if path.endswith(".probe"):
+                for layer_id in stats_registry:
+                    if path.endswith(f"layers.{layer_id}.probe"):
+                        stats_registry[layer_id]['S_out'] = update_sym_matrix(stats_registry[layer_id]['S_out'], g_val)
+                        break
 
-        for txt in batch_prompts:
-            if processed >= n_samples: break
-            ids = tokenizer.encode(txt)
-            if len(ids) == 0: continue
-            ids = mx.array([ids])
-            B, L = ids.shape
-            roper = Roper(config, L)
-            rope = roper(mx.arange(L)[None, :])
-            mask = create_causal_mask(mx.array([[True]*L]))
-            try:
-                model(ids, mask, rope, cache)
-                mx.eval(stats)
-            except Exception as e:
-                print(f"Warning: Batch failed {e}")
-            processed += 1
-            pbar.update(1)
+        mx.eval(loss)
+        processed += B
+        pbar.update(B)
     pbar.close()
-
-    for i, layer in enumerate(model.model.layers):
-        layer.mlp = original_mlps[i]
-
-    if not stats:
-        print("Error: No stats collected.")
-        return model
-
-    for i in range(len(model.model.layers)):
-        if i not in stats: continue
-        
-        C = stats[i] / counts[i]
-        D_int = C.shape[0]
-        
-        reg = C + (lambda_val * mx.eye(D_int, dtype=mx.float32))
-        reg_inv = mx.linalg.inv(reg, stream=mx.cpu)
-        s = mx.diag(C @ reg_inv)
-
-        perm = mx.argsort(s)[::-1]
-        
-        mlp = model.model.layers[i].mlp
-        
-        mlp.gate_proj.weight = mlp.gate_proj.weight[perm]
-        mlp.up_proj.weight   = mlp.up_proj.weight[perm]
-        mlp.down_proj.weight = mlp.down_proj.weight[:, perm]
-
-        if prune_ratio > 0.0:
-            keep = int(D_int * (1.0 - prune_ratio))
-            mlp.gate_proj.weight = mlp.gate_proj.weight[:keep]
-            mlp.up_proj.weight   = mlp.up_proj.weight[:keep]
-            mlp.down_proj.weight = mlp.down_proj.weight[:, :keep]
-            if i == 0 and verbose: print(f"   Layer 0 pruned to {keep}/{D_int}")
-
-    mx.eval(model)
-    return model
-
-def cascade(ds_id, model, tokenizer, config, teacher, to='distilled.safetensors', collapse_ranges=None):
-    if collapse_ranges is None:
-        collapse_ranges = [(9,13), (13,17)]
-    for range_tuple in collapse_ranges:
-        model = collapse(model, collapse_ranges=[range_tuple])
-        model = distill(ds_id, model, tokenizer, config, teacher, to=to)
-    return model
-
-def dampen(model, lambda_val=0.3, sim_threshold=0.5, ft_check_rank=1024, verbose=True):
-    import numpy as np
-    from mlx.utils import tree_unflatten
-
-    def to_np(x): 
-        return np.array(x.astype(mx.float32))
 
     replacements = []
     
-    for name, module in model.named_modules():
-        if isinstance(module, DoRALinear):
-            if verbose:
-                print(f"[{PRETTY_HW}] Processing {name}...")
-            W_0_mx = module._dequantized_weight()
-            dtype = W_0_mx.dtype
-            delta = (module.scale * module.lora_b.T) @ module.lora_a.T
-            W_prime = W_0_mx + delta
-            
-            norm_W_prime = mx.linalg.norm(W_prime, axis=1, keepdims=True)
-            scale_vec = module.m[:, None] / (norm_W_prime) 
-            W_ft_mx = scale_vec * W_prime
-            
-            W_0 = to_np(W_0_mx)
-            W_ft = to_np(W_ft_mx)
-            
-            U_ft, S_ft, Vt_ft = np.linalg.svd(W_ft, full_matrices=False)
-            U_0, _, _ = np.linalg.svd(W_0, full_matrices=False)
-            U_ref = U_0
-            
-            k_check = min(ft_check_rank, U_ft.shape[1])
-            U_check = U_ft[:, :k_check]
-            
-            # projections = np.dot(U_check.T, U_ref)
-            # similarities = np.sqrt(np.sum(projections**2, axis=1))
-            similarity_matrix = np.abs(np.dot(U_check.T, U_0))
-            similarities = np.max(similarity_matrix, axis=1)
-            
-            is_intruder = similarities < sim_threshold
-            intruder_indices = np.where(is_intruder)[0]
-            
-            if len(intruder_indices) > 0:
-                # # {{{ --- v0 ---
-                # worst_idx_local = np.argmin(similarities[intruder_indices])
-                # worst_idx_global = intruder_indices[worst_idx_local]
-                # worst_sim = similarities[worst_idx_global]
-                # S_new = S_ft.copy()
-                # S_new[worst_idx_global] *= lambda_val
-                # if verbose:
-                #     print(f"   -> Found {len(intruder_indices)} candidates. Dampening rank {worst_idx_global} (Sim: {worst_sim:.4f})")
-                # W_new = (U_ft * S_new[None, :]) @ Vt_ft
-                # W_final_mx = mx.array(W_new)
-                # # }}} --- v0 ---
-                # {{ --- v1 ---
-                worst_idx_local = np.argmin(similarities[intruder_indices])
-                worst_idx_global = intruder_indices[worst_idx_local]
-                worst_sim = similarities[worst_idx_global]
-                remove_factor = (1.0 - lambda_val)
-                intruder_vec = np.outer(U_ft[:, worst_idx_global], Vt_ft[worst_idx_global, :])
-                intruder_component = intruder_vec * S_ft[worst_idx_global]
-                subtraction_matrix = intruder_component * remove_factor
-                if verbose:
-                    print(f"   -> Found {len(intruder_indices)} candidates.")
-                    print(f"   -> Subtracting {(remove_factor*100):.0f}% of rank {worst_idx_global} (Sim: {worst_sim:.4f})")
-                W_final_mx = W_ft_mx - mx.array(subtraction_matrix)
-                # }} --- v1 ---
-            else:
-                if verbose:
-                    print(f"   -> No strong intruders found. Keeping exact weights.")
-                W_final_mx = W_ft_mx
-            out_d, in_d = W_final_mx.shape
-            has_bias = hasattr(module.linear, 'bias') and (module.linear.bias is not None)
-            new_linear = nn.Linear(in_d, out_d, bias=has_bias)
-            new_linear.weight = W_final_mx.astype(dtype)
-            if has_bias:
-                new_linear.bias = module.linear.bias
-            replacements.append((name, new_linear))
-    if replacements:
-        model.update_modules(tree_unflatten(replacements))
-        print(f"[{PRETTY_HW}] Successfully healed and merged {len(replacements)} layers.")
-    else:
-        print("No DoRALinear layers found.")
-    mx.eval(model)
-    return model
-# }}} === SVD ===
-class RecurrentBlock(nn.Module):
-    def __init__(self, layer, n_rcr=3):
-        super().__init__()
-        self.layer = layer
-        self.n_rcr = n_rcr
+    def compute_sqrt_and_inv(M, epsilon=1e-5):
+        d, V = np.linalg.eigh(M)
+        d = np.maximum(d, epsilon)
+        sqrt_d = np.sqrt(d)
+        inv_sqrt_d = 1.0 / sqrt_d
+        M_sqrt = (V * sqrt_d[None, :]) @ V.T
+        M_inv_sqrt = (V * inv_sqrt_d[None, :]) @ V.T
+        return M_sqrt, M_inv_sqrt
 
-    def __call__(self, x, attention_mask=None, rope=None, cache=None):
-        B, L, D = x.shape
-        for i in range(self.n_rcr):
-        # for i in range(1): # https://openreview.net/forum?id=ngmEcEer8a
-            # if getattr(cache, "rollback", None):
-            #     cache.rollback(L*(i>0))
-            # x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=cache[i])
-            c = cache[i] if isinstance(cache, list) else cache
-            x = self.layer(x, attention_mask=attention_mask, rope=rope, cache=c)
-        return x
-
-def collapse(model, collapse_ranges=None, do_rectify=False, do_quantize=False):
-    if collapse_ranges is None:
-        collapse_ranges = [(13,17)]
-    layers = model.model.layers
-    new_layers = []
-    teacher_to_student = [] 
-    start_to_range = {start: (start, end) for start, end in collapse_ranges}
-    indices_to_skip = set()
-    for start, end in collapse_ranges:
-        for i in range(start + 1, end):
-            indices_to_skip.add(i)
-    teacher_offset = 0
-    for i, layer in enumerate(layers):
-        student_idx = len(new_layers)
-        if i in start_to_range:
-            start, end = start_to_range[i]
-            n_rcr = end - start
-            teacher_to_student.append((teacher_offset+end - 1, student_idx))
-            ref_layer = layer
-            if hasattr(ref_layer.self_attn, 'to_retention') and do_rectify:
-                ref_layer.self_attn = ref_layer.self_attn.to_retention(model._config)
-            rec_block = RecurrentBlock(ref_layer, n_rcr=n_rcr)
-            new_layers.append(rec_block)
-        elif i in indices_to_skip:
+    for layer_id, stats in stats_registry.items():
+        if stats['S_in'] is None or stats['S_out'] is None:
+            if verbose: print(f"      ! No stats for {layer_id}, skipping.")
             continue
-        else:
-            if getattr(layer, 'n_rcr', None):
-                teacher_offset += (layer.n_rcr-1)
-            new_layers.append(layer)
-    model.model.layers = new_layers
-    model.teacher_to_student = teacher_to_student
-    if do_quantize:
-        nn.quantize(model, 32, 8, class_predicate=lambda p, m: (isinstance(m, nn.Linear) or isinstance(m, nn.Embedding)) and not p.endswith('_new'))
+        orig_module = original_modules[layer_id]
+        W_orig = orig_module.weight
+        if isinstance(orig_module, nn.QuantizedLinear):
+            W_orig = mx.dequantize(W_orig, orig_module.scales, orig_module.biases, orig_module.group_size, orig_module.bits)
+        W_np = np.array(W_orig.astype(mx.float32)) # (Out, In)
+        n = stats['n']
+        C_in = np.array(stats['S_in'].astype(mx.float32)) / n
+        C_out = np.array(stats['S_out'].astype(mx.float32)) / n
+        
+        try:
+            S_in_sqrt, S_in_inv = compute_sqrt_and_inv(C_in)
+            S_out_sqrt, S_out_inv = compute_sqrt_and_inv(C_out)
+            W_tilde = S_out_sqrt @ W_np @ S_in_sqrt
+            U, S, Vt = np.linalg.svd(W_tilde, full_matrices=False)
+            k = min(rank, len(S))
+            U_k = U[:, :k]
+            S_k = S[:k]
+            Vt_k = Vt[:k, :]
+            sqrt_S = np.sqrt(S_k)
+            B_prime = S_out_inv @ (U_k * sqrt_S[None, :])
+            A_prime = (sqrt_S[:, None] * Vt_k) @ S_in_inv
+            has_bias = "bias" in orig_module and orig_module.bias is not None
+            bias_val = orig_module.bias if has_bias else None
+            lrl = LoRAONLynear.from_weights(A_prime, B_prime, linear=None, bias=bias_val)
+            replacements.append((f"layers.{layer_id}", lrl))
+        except Exception as e:
+            if verbose: print(f"      ! Failed for {layer_id}: {e}")
+            replacements.append((f"layers.{layer_id}", orig_module))
+
+    for layer_id in stats_registry:
+        full_path_key = f"layers.{layer_id}"
+        already_handled = any(r[0] == full_path_key for r in replacements)
+        if not already_handled:
+            replacements.append((full_path_key, original_modules[layer_id]))
+
+    if replacements:
+        model.model.update_modules(tree_unflatten(replacements))
+    
+    model.unfreeze()
+    mx.eval(model)
+    print(f"[{PRETTY_HW}] Replaced {len([r for r in replacements if isinstance(r[1], LoRAONLynear)])} layers.")
     return model
 
-def distill(ds_id, model, tokenizer, config, teacher=None, n_epochs=1, lr=1e-4, bs=1, sl=4096, to='distilled.safetensors', unfreeze_all=False):
-    teacher_to_student = getattr(model, "teacher_to_student", None)
-    student_indices = [s[1] for s in teacher_to_student] if teacher_to_student else []
-    print(f'{teacher_to_student=}')
-    from mlx.utils import tree_unflatten
-    model.freeze()
-    def to_dora_(layer):
-        _rank = 64
-        return DoRALinear.from_linear(layer, r=_rank, alpha=_rank, scale=1.0, dropout=0.0)
-    for layer_idx, l in enumerate(model.model.layers):
-        if getattr(l, 'n_rcr', None) and (layer_idx in student_indices):
-            print(f'{layer_idx=}')
-            loralized = [(k, to_dora_(m)) for k, m in l.named_modules() if k.endswith('proj')]
-            l.update_modules(tree_unflatten(loralized))
-            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith('_new') else None)
-    if unfreeze_all:
-        for l in model.model.layers:
-            l.apply_to_modules(lambda k, v: v.unfreeze() if k.endswith(('lora_a', 'lora_b')) else None)
-    print_trainable_parameters(model)
-    from datasets import load_dataset
-    ds = load_dataset(ds_id, split="test").to_list()
-    ds = ds#[:200]
-    ds = [dict(str_i=_r['prompt'], str_o=_r['completion']) for _r in ds]
-    model = _train(ds, model, tokenizer, config, teacher=teacher, n_epochs=n_epochs, lr=lr, bs=bs, sl=sl, teacher_to_student=teacher_to_student)
-    from mlx.utils import tree_flatten
-    mx.save_safetensors(to, dict(tree_flatten(model.parameters())), metadata=None) # just to see how small; [] need quant params to load though
-    mx.clear_cache()
-    return model
+# }}} === FISH ===
