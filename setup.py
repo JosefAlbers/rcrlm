@@ -18,7 +18,7 @@ setup(
     name='rcrlm',
     url='https://github.com/JosefAlbers/rcrlm',
     packages=find_packages(),
-    version='0.0.3a1',
+    version='0.0.3a2',
     readme="README.md",
     author_email="albersj66@gmail.com",
     description="rcr-lm: to inspect hiddens, steer activations, and compress/distill/finetune weights",

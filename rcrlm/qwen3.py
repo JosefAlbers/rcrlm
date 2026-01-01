@@ -4,6 +4,7 @@ import mlx.core as mx
 import mlx.nn as nn
 import math
 
+# {{{ v0
 class Retention(nn.Module):
     def __init__(self, config, *, rcr_idx=None):
         super().__init__()
@@ -27,6 +28,7 @@ class Retention(nn.Module):
         self.gn_new = nn.GroupNorm(num_groups=n_heads, dims=val_dim, affine=False)
         self.rot_dims = rot_dims = None if getattr(config, "partial_rotary_factor", 1.0) >= 1.0 else int(self.head_dim * getattr(config, "partial_rotary_factor", 1.0))
         self.apply_rope = mx.compile(create_rope_applier(rot_dims, config.rope_traditional))
+        self.need_RetCacher = True
 
     def __call__(self, x, attention_mask, rope, cache):
         B, L, _ = x.shape
@@ -91,6 +93,7 @@ class Retention(nn.Module):
         gamma = self._gamma[:, None, None]
         D = (gamma ** diff) * mask
         return mx.stop_gradient(D)
+# }}} v0
 
 class Attention(nn.Module):
     def __init__(self, config, *, rcr_idx):
@@ -183,7 +186,7 @@ class Qwen3Model(nn.Module):
 class Qwen3ForCausalLM(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.tie = tie = config.tie_word_embeddings
+        self.tie = tie = getattr(config, "tie_word_embeddings", None) is not False
         self.model = Qwen3Model(config)
         self._config = config
         if not tie:
