@@ -1,19 +1,24 @@
 import numpy as np
+import mlx.core as mx
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
 
-def visualize_svd(A, k=None):
+def plt_svd(A, fraction=None, show=True):
     if A.ndim != 2:
         raise ValueError("Input A must be a 2D matrix.")
     
+    A = A.astype(mx.float32) if isinstance(A, mx.array) else A
+    A = np.array(A).astype(np.float32)
+
     M, N = A.shape
     U, S, Vt = np.linalg.svd(A, full_matrices=False)
     K_full = len(S)
     
-    if k is None:
-        k = K_full // 4
-    k = min(k, K_full)
+    if fraction is None:
+        k = K_full
+    else:
+        k = min(K_full, int(K_full*fraction))
 
     Uk = U[:, :k]
     Sk = S[:k]
@@ -46,7 +51,6 @@ def visualize_svd(A, k=None):
     max_h = M 
     
     def pad_and_center(img, target_h):
-        # img is (h, w, 4) RGBA
         h, w, c = img.shape
         if h >= target_h:
             return img, 0, h
@@ -121,22 +125,26 @@ def visualize_svd(A, k=None):
     ax_Ak = plt.subplot(gs[8])
     ax_Ak.imshow(Ak, cmap='gray', aspect='equal')
     
-    ax_Ak.set_title(f"$A_k$ (k={k})", color='black', alpha=0)
-    ax_Ak.text(0.5, 1.02, r"$A_k$ ", color='black', ha='right', va='bottom', transform=ax_Ak.transAxes, fontsize=12)
-    ax_Ak.text(0.5, 1.02, f"(k={k})", color='red', ha='left', va='bottom', transform=ax_Ak.transAxes, fontsize=12)
-    ax_Ak.text(0.5, -0.05, f"{M}x{N}", ha='center', va='top', transform=ax_Ak.transAxes, color='black')
+    ax_Ak.set_title(f"$A_k$ (k={k})\n{M}x{N}")
     clean_axis(ax_Ak)
 
     plt.suptitle(f'Truncated SVD Visualization', fontsize=16)
     plt.tight_layout()
-    plt.show()
+    plt.savefig('out.png')
+    if show:
+        plt.show()
+    return mx.array(Uk), mx.array(Sigmak), mx.array(Vtk)
 
-from skimage import data
-from skimage.color import rgb2gray
-from skimage.transform import resize
-# image_bw = rgb2gray(data.astronaut())
-image_bw = data.moon()
-image_bw = resize(image_bw, (512, 512))
-image_bw = image_bw[64:128+64,:]
-# image_bw = image_bw[:, 64:128+64]
-visualize_svd(image_bw, k=100)
+
+def get_2d():
+    from skimage import data
+    from skimage.color import rgb2gray
+    from skimage.transform import resize
+    image_bw = rgb2gray(data.astronaut())
+    image_bw = resize(image_bw, (512, 512))
+    return image_bw
+
+if __name__ == '__main__':
+    A = get_2d()
+    plt_svd(A, fraction=0.125)
+

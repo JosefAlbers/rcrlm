@@ -204,18 +204,18 @@ def measure_performance(start_time, prompt_time, end_time, batch_size, seq_lengt
         print(f'└{PRETTY_HW*2}───────────┘')
     return metrics
 
-def _np(arr, dtype=np.float64):
+def to_np(arr, dtype=np.float64):
     arr = arr.astype(mx.float32) if isinstance(arr, mx.array) else arr
     return np.array(arr).astype(dtype)
 
-def _mx(arr, dtype=mx.bfloat16):
+def to_mx(arr, dtype=mx.bfloat16):
     return mx.array(arr, dtype=dtype)
 
-def _svd(arr, *, ratio=None, **kwargs):
-    U, s, Vt = np.linalg.svd(_np(arr), **kwargs)
-    if ratio is None:
+def svd(arr, *, fraction=None, **kwargs):
+    U, s, Vt = np.linalg.svd(to_np(arr), **kwargs)
+    if fraction is None:
         return U, s, Vt
-    rank = max(1, int(len(s) * ratio))
+    rank = max(1, int(len(s) * fraction))
     U_k = U[:, :rank]
     s_k = s[:rank]
     Vt_k = Vt[:rank, :]
@@ -467,14 +467,14 @@ def step_models(models, tokenizer, config, n_samples=32):
         ntok += B*L
         yield ntok
 
-def get_mod(model, path):
+def get_module(model, path):
     parts = path.split('.')
     curr = model
     for p in parts:
         curr = curr[int(p)] if p.isdigit() else getattr(curr, p)
     return curr
 
-def set_mod(model, path, new_mod):
+def set_module(model, path, new_mod):
     parts = path.split('.')
     parent = model
     for p in parts[:-1]:
@@ -513,26 +513,26 @@ def tmp_hooks(model, paths, callback_factory):
     original_mods = {}
     try:
         for p in paths:
-            orig = get_mod(model, p)
+            orig = get_module(model, p)
             original_mods[p] = orig
-            set_mod(model, p, Hook(orig, callback_factory(p)))
+            set_module(model, p, Hook(orig, callback_factory(p)))
         yield
     finally:
         for p, orig in original_mods.items():
-            set_mod(model, p, orig)
+            set_module(model, p, orig)
 @contextmanager
 def tmp_hook(model, path, callback):
     """
     Context manager for hooking a single layer.
     """
-    orig = get_mod(model, path)
+    orig = get_module(model, path)
     try:
         # Apply the hook
-        set_mod(model, path, Hook(orig, callback))
+        set_module(model, path, Hook(orig, callback))
         yield
     finally:
         # Always restore, even if the loop crashes
-        set_mod(model, path, orig)
+        set_module(model, path, orig)
 
 # }}} === UTIL ===
 # {{{ === INFER ===
@@ -1297,7 +1297,7 @@ def abliterate(
 # }}} === ABLITERATE ===
 # {{{ === SVD ===
 
-def collect_stats(model, tokenizer, config, paths, agg_fn, n_samples=32):
+def collect_stats(agg_fn, paths, model, tokenizer, config, n_samples=32):
     stats = {}
     def make_callback(key):
         def _cb(x):
@@ -1310,19 +1310,19 @@ def collect_stats(model, tokenizer, config, paths, agg_fn, n_samples=32):
     return {k: v/ntok for k,v in stats.items()}
 
 def ww_diag(c, alpha=1.0):
-    l = np.maximum(_np(c) ** alpha, 1e-6)
+    l = np.maximum(to_np(c) ** alpha, 1e-6)
     L = np.diag(l)
     return L, np.diag(1/l)
 
 def ww_svd(C):
-    U, s, _ = _svd(C, hermitian=True)
+    U, s, _ = svd(C, hermitian=True)
     s = np.sqrt(np.maximum(s, 1e-6))[None, :]
     L = U * s
     Li = ((1/s)*U).T
     return L, Li
 
 def ww_cholesky(C, eps=None):
-    C = _np(C) + eps * np.eye(C.shape[0]) if eps is not None else _np(C)
+    C = to_np(C) + eps * np.eye(C.shape[0]) if eps is not None else to_np(C)
     L = np.linalg.cholesky(C)
     Li = np.linalg.inv(L)
     return L, Li
@@ -1337,59 +1337,59 @@ def ww_inv_cholesky(H, ridge=1e-4):
     # # }}} v0
     return L, L.T
 
-def compress_asvd(model, tokenizer, config, layers, targets=None, ratio=0.1, alpha=0.5): # asvd
+def compress_asvd(model, tokenizer, config, layers, targets=None, fraction=0.1, alpha=0.5): # asvd
     paths = get_linear_paths(model, layers, targets=targets)
-    stats = collect_stats(model, tokenizer, config, paths, lambda x: mx.sum(mx.abs(x), axis=0)) 
+    stats = collect_stats(lambda x: mx.sum(mx.abs(x), axis=0), paths, model, tokenizer, config) 
     for path in paths:
-        mod = get_mod(model, path)
-        W = _np(mod.weight)
+        mod = get_module(model, path)
+        W = to_np(mod.weight)
         L, Li = ww_diag(stats[path])
-        U, S, Vt = _svd(W@L, ratio=ratio, full_matrices=False)
-        set_mod(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
+        U, S, Vt = svd(W@L, fraction=fraction, full_matrices=False)
+        set_module(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
     return model
 
-def compress_slv1(model, tokenizer, config, layers, targets=None, ratio=0.1): # svd-llm-v1, asvd+
+def compress_slv1(model, tokenizer, config, layers, targets=None, fraction=0.1): # svd-llm-v1, asvd+
     paths = get_linear_paths(model, layers, targets=targets)
-    stats = collect_stats(model, tokenizer, config, paths, lambda x: x.T@x)
+    stats = collect_stats(lambda x: x.T@x, paths, model, tokenizer, config)
     for path in paths:
-        mod = get_mod(model, path)
-        W = _np(mod.weight)
+        mod = get_module(model, path)
+        W = to_np(mod.weight)
         L, Li = ww_cholesky(stats[path])
-        U, S, Vt = _svd(W@L, ratio=ratio, full_matrices=False)
-        set_mod(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
+        U, S, Vt = svd(W@L, fraction=fraction, full_matrices=False)
+        set_module(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
     return model
 
-def compress_slv2(model, tokenizer, config, layers, targets=None, ratio=0.1): # svd-llm-v2
+def compress_slv2(model, tokenizer, config, layers, targets=None, fraction=0.1): # svd-llm-v2
     paths = get_linear_paths(model, layers, targets=targets)
-    stats = collect_stats(model, tokenizer, config, paths, lambda x: x.T@x)
+    stats = collect_stats(lambda x: x.T@x, paths, model, tokenizer, config)
     for path in paths:
-        mod = get_mod(model, path)
-        W = _np(mod.weight)
+        mod = get_module(model, path)
+        W = to_np(mod.weight)
         L, Li = ww_svd(stats[path])
-        U, S, Vt = _svd(W@L, ratio=ratio, full_matrices=False)
-        set_mod(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
+        U, S, Vt = svd(W@L, fraction=fraction, full_matrices=False)
+        set_module(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
     return model
 
-def compress_bash(model, tokenizer, config, layers, targets=None, ratio=0.1): # basis sharing
+def compress_bash(model, tokenizer, config, layers, targets=None, fraction=0.1): # basis sharing
     paths, groups = get_linear_paths(model, layers, targets=targets, return_groups=True)
-    stats = collect_stats(model, tokenizer, config, paths, lambda x: x.T@x)
+    stats = collect_stats(lambda x: x.T@x, paths, model, tokenizer, config)
     for group in groups.values():
-        Ws = [get_mod(model, p).weight for p in group]
-        W = _np(mx.concatenate(Ws, axis=0))
+        Ws = [get_module(model, p).weight for p in group]
+        W = to_np(mx.concatenate(Ws, axis=0))
         L, Li = ww_cholesky(sum([stats[p] for p in group])) # redundancy to fix later
-        U, S, Vt = _svd(W@L, ratio=ratio, full_matrices=False)
+        U, S, Vt = svd(W@L, fraction=fraction, full_matrices=False)
         A_shared = (S[:, None] * Vt) @ Li
         B_list = np.split(U, len(Ws), axis=0)
         A_layer = nn.Linear(A_shared.shape[1], A_shared.shape[0], bias=False)
-        A_layer.weight = _mx(A_shared)
+        A_layer.weight = to_mx(A_shared)
         for i, path in enumerate(group):
-            mod = get_mod(model, path)
+            mod = get_module(model, path)
             lrl = LoRAONLynear.from_weights(None, B_list[i], bias=mod.bias if hasattr(mod, 'bias') else None)
             lrl.lora_a = A_layer
-            set_mod(model, path, lrl)
+            set_module(model, path, lrl)
     return model
 
-def compress_saes(model, tokenizer, config, layers, teacher, ratio=0.2, alpha_bounds=(0.2, 0.8)):
+def compress_saes(model, tokenizer, config, layers, teacher, fraction=0.2, alpha_bounds=(0.2, 0.8)):
     def collect_stats_pair(student, teacher, tokenizer, config, path):
         captures = {}
         def make_callback(key):
@@ -1406,12 +1406,12 @@ def compress_saes(model, tokenizer, config, layers, teacher, ratio=0.2, alpha_bo
                 Delta += ((x_t - x_s).T @ x_s)
                 mx.eval(H, Delta)
                 captures.clear()
-        return _np(H)/ntok, _np(Delta)/ntok
+        return to_np(H)/ntok, to_np(Delta)/ntok
 
-    def solve_aces_beta(S, D, ratio, alpha_bounds): # {{{
+    def solve_aces_beta(S, D, fraction, alpha_bounds): # {{{
         b_min = alpha_bounds[0] / (1 + alpha_bounds[0])
         b_max = alpha_bounds[1] / (1 + alpha_bounds[1])
-        Ur, sr, Vtr = _svd(S, ratio=ratio, full_matrices=False)
+        Ur, sr, Vtr = svd(S, fraction=fraction, full_matrices=False)
         UrT_D = Ur.T @ D
         D_VtrT = D @ Vtr.T
         UrT_D_VtrT = UrT_D @ Vtr.T
@@ -1438,15 +1438,15 @@ def compress_saes(model, tokenizer, config, layers, teacher, ratio=0.2, alpha_bo
         elif abs(coeff_1) > 1e-9:
             candidates.append(-coeff_0 / coeff_1)
         best_beta = b_min
-        min_ratio = float('inf')
+        min_fraction = float('inf')
         for beta in candidates:
             if b_min <= beta <= b_max:
                 tail_energy = a + 2*beta*b + (beta**2)*c
                 total_energy = A_big + 2*beta*B_big + (beta**2)*C_big
                 if total_energy < 1e-12: continue
-                ratio = tail_energy / total_energy
-                if ratio < min_ratio:
-                    min_ratio = ratio
+                fraction = tail_energy / total_energy
+                if fraction < min_fraction:
+                    min_fraction = fraction
                     best_beta = beta
         return best_beta # }}}
 
@@ -1454,15 +1454,15 @@ def compress_saes(model, tokenizer, config, layers, teacher, ratio=0.2, alpha_bo
     for path in paths:
         H, Delta = collect_stats_pair(model, teacher, tokenizer, config, path)
         L, Li = ww_inv_cholesky(H)
-        mod = get_mod(model, path)
-        W = _np(mod.weight)
+        mod = get_module(model, path)
+        W = to_np(mod.weight)
         Sl = W @ H @ L
         Dl = W @ Delta @ L
-        beta = solve_aces_beta(Sl, Dl, ratio, alpha_bounds=alpha_bounds)
-        print(f"  -> {path} | Ratio: {ratio} | Beta: {beta:.4f}")
-        U, S, Vt = _svd(Sl + beta * Dl, ratio=ratio, full_matrices=False)
+        beta = solve_aces_beta(Sl, Dl, fraction, alpha_bounds=alpha_bounds)
+        print(f"  -> {path} | Fraction: {fraction} | Beta: {beta:.4f}")
+        U, S, Vt = svd(Sl + beta * Dl, fraction=fraction, full_matrices=False)
         new_mod = LoRAONLynear.from_weights(Vt @ Li,  U*S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None)
-        set_mod(model, path, new_mod)
+        set_module(model, path, new_mod)
         mx.eval(model.parameters())
 
     return model

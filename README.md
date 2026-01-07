@@ -373,15 +373,14 @@ _ = infer("Write a story about Einstein\n", **m, stream=False, max_new_tokens=10
 ### Compressing LLMs
 
 ```python
-from rcrlm.utils import *
 paths = get_linear_paths(model, layers, targets=targets)
-stats = collect_stats(model, tokenizer, config, paths, lambda x: x.T@x)
+stats = collect_stats(lambda x: x.T@x, paths, model, tokenizer, config)
 for path in paths:
-    mod = get_mod(model, path)                             # : get module
-    W = _np(mod.weight)                                    # : get weight
+    mod = get_module(model, path)                          # : get module
+    W = to_np(mod.weight)                                  # : get weight
     L, Li = ww_svd(stats[path])                            # : whiten with svd
-    U, S, Vt = _svd(W@L, ratio=ratio, full_matrices=False) # : compress
-    set_mod(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
+    U, S, Vt = svd(W@L, fraction=0.1, full_matrices=False) # : compress
+    set_module(model, path, LoRAONLynear.from_weights(Vt @ Li, U * S[None, :], bias=mod.bias if hasattr(mod, 'bias') else None))
 ```
 
 ### Integrated Evaluation

@@ -8,7 +8,7 @@ ARCHS = dict(
     Gemma3ForCausalLM=Gemma3ForCausalLM,
 )
 
-def test(task='svd', num_repeat=1):
+def test(task='all', num_repeat=1):
     if task == 'svd' or task == 'all':
         m = load()
         print('〄 Testing svd...')
