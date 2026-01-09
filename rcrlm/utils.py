@@ -175,8 +175,7 @@ def load_model(model_cls, model_dir, model_cfg):
     def _get_wt(model_dir, model_cfg):
         if getattr(model_cfg, 'sanitized', False):
             return [(k, v) for wf in glob.glob(f"{model_dir}/*.safetensors") for k, v in mx.load(wf).items()]
-        return [(k, v.transpose(0, 2, 3, 1) if "patch_embedding.weight" in k else v) for wf in glob.glob(f"{model_dir}/*.safetensors") for k, v in mx.load(wf).items()]
-    # print(f'{model_cfg=}')
+        return [(f"model.{k}" if (not k.startswith("model.") and "." in k) else k, v.transpose(0, 2, 3, 1) if "patch_embedding.weight" in k else v) for wf in glob.glob(f"{model_dir}/*.safetensors") for k, v in mx.load(wf).items()]
     model = model_cls(model_cfg)
     model.load_weights(_get_wt(model_dir, model_cfg), strict=False)
     mx.eval(model)
@@ -548,7 +547,6 @@ def infer(
     custom_tokenizer_fn: Callable = None,
     model_creator: Callable = None,
     stream = True,
-    use_scan = False,
     use_jit = True,
     chat_template_kwargs = None,
     verbose = True,
@@ -678,6 +676,17 @@ def infer(
     if verbose:
         _ = measure_performance(start_tic, prompt_tic, end_tic, B, L, max_new_tokens, verbose=verbose)
     return dict(inp_str=input_str, inp_ids=input_ids, out_str=output_str, out_ids=output_ids)
+
+def embed(prompts, model, tokenizer, config, max_length=8192):
+    tokens = [tokenizer.encode(p)[:max_length-1]+[config.eos_token_id] for p in prompts]
+    input_ids, position_ids, padding_mask = tokenizer.pad_token_sequences(tokens, 1, 1)
+    causal_mask = create_causal_mask(padding_mask)
+    rope = Roper(config)(mx.array(position_ids))
+    cache = [lambda x,y:(x,y)]*len(model.model.layers)
+    last_hiddens, _ = model.model(mx.array(input_ids), causal_mask, rope, cache)
+    embeddings = last_hiddens[:,-1]
+    embeddings /= mx.linalg.norm(embeddings, axis=-1, keepdims=True)
+    return embeddings
 
 # }}} === INFER ===
 # {{{ === LoRA ===

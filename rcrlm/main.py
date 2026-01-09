@@ -1,5 +1,5 @@
 from tokenizerz import Tokenizer
-from .utils import load_model, load_config, download_repo, infer, train, cascade, dampen, abliterate, compress_asvd, compress_slv1, compress_slv2, compress_bash, compress_saes
+from .utils import load_model, load_config, download_repo, infer, embed, train, cascade, dampen, abliterate, compress_asvd, compress_slv1, compress_slv2, compress_bash, compress_saes
 from .qwen3 import Qwen3ForCausalLM
 from .gemma3 import Gemma3ForCausalLM
 
@@ -9,6 +9,27 @@ ARCHS = dict(
 )
 
 def test(task='all', num_repeat=1):
+    if task == 'embed' or task == 'all': # https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+        m = load("Qwen/Qwen3-Embedding-0.6B")
+        print('〄 Testing embedding...')
+        # {{
+        task = 'Given a web search query, retrieve relevant passages that answer the query'
+        def get_detailed_instruct(task_description, query):
+            return f'Instruct: {task_description}\nQuery:{query}'
+        queries = [
+            get_detailed_instruct(task, 'What is the capital of China?'),
+            get_detailed_instruct(task, 'Explain gravity')
+        ]
+        documents = [
+            "The capital of China is Beijing.",
+            "Gravity is a force that attracts two bodies towards each other. It gives weight to physical objects and is responsible for the movement of planets around the sun."
+        ]
+        input_texts = queries + documents
+        # }}
+        embeddings = embed(input_texts, **m)
+        scores = (embeddings[:2] @ embeddings[2:].T)
+        print(scores)
+        del m
     if task == 'svd' or task == 'all':
         m = load()
         print('〄 Testing svd...')
@@ -139,7 +160,6 @@ def cli():
     parser.add_argument("-m", "--model", type=str, default='Qwen/Qwen3-0.6B', dest="model_id", help="Model ID in the format 'repo/model_name'.")
     parser.add_argument("-p", "--prompts", type=str, nargs='*', help="Prompt(s) for generation.")
     parser.add_argument("-n", "--new", type=int, default=100, help="Maximum new tokens to generate.")
-    parser.add_argument("-s", "--scan", action="store_true", help="Enable scan mode.")
     parser.add_argument("-j", "--jit", action="store_true", help="Enable JIT compilation.")
     parser.add_argument("--no-format", dest="use_chat_template", action="store_false", help="Do not use chat template.")
     parser.add_argument("--no-stream", dest="stream", action="store_false", help="Do not stream output.")
